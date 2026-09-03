@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 
 import pandas as pd
 import plotly.express as px
@@ -33,16 +34,23 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# Palette
+# Palette — premium legal-tech: deep navy / teal / gold on off-white text
 # ---------------------------------------------------------------------------
-NAVY = "#0f2a4a"
-NAVY_2 = "#1c4a7e"
-GOLD = "#c9a227"
-GOLD_2 = "#e6c65c"
-TEAL = "#2a9d8f"
-SLATE = "#5b6b7d"
-SEV_COLORS = {"high": "#c0392b", "medium": "#d68910", "low": "#7d8a99"}
-LEVEL_COLORS = {"High": "#c0392b", "Medium": "#d68910", "Low": "#1e8449"}
+BG = "#071525"          # deep navy background
+CARD = "#0D2235"        # card navy
+TEAL_SURFACE = "#123A46"
+NAVY = "#0B1F35"
+NAVY_2 = "#185A63"      # teal
+GOLD = "#D6B35A"
+GOLD_2 = "#E8CA78"
+TEAL = "#185A63"
+INK = "#F5F3ED"         # off-white text
+SLATE = "#8FA1AE"       # muted blue-grey
+SUCCESS = "#5FBF8F"
+WARNING = "#D9A441"
+DANGER = "#C96868"
+SEV_COLORS = {"high": DANGER, "medium": WARNING, "low": SLATE}
+LEVEL_COLORS = {"High": DANGER, "Medium": WARNING, "Low": SUCCESS}
 
 # ---------------------------------------------------------------------------
 # Icon set (clean line icons — no emoji)
@@ -96,135 +104,194 @@ LOGO_SVG = """
 # ---------------------------------------------------------------------------
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap');
 
 :root {
-  --navy:#0f2a4a; --navy-2:#1c4a7e; --gold:#c9a227; --gold-2:#e6c65c;
-  --bg:#eaf0f6; --card:#ffffff; --ink:#1c2733; --muted:#5b6b7d; --ring:rgba(15,42,74,.08);
+  --bg:#071525; --bg2:#0a1b2e; --card:#0D2235; --card2:#123A46; --teal:#185A63;
+  --gold:#D6B35A; --gold-2:#E8CA78; --ink:#F5F3ED; --muted:#8FA1AE;
+  --ring:rgba(214,179,90,.14); --line:rgba(143,161,174,.14);
+  --success:#5FBF8F; --warning:#D9A441; --danger:#C96868;
 }
-html, body, [class*="css"] { font-family:'Inter',system-ui,sans-serif; }
-[data-testid="stAppViewContainer"] { background:
-   radial-gradient(1100px 480px at 100% -8%, rgba(28,74,126,.08), transparent),
-   radial-gradient(900px 400px at -10% 0%, rgba(201,162,39,.06), transparent), var(--bg); }
+html, body, [class*="css"] { font-family:'Manrope',system-ui,sans-serif; color:var(--ink); }
+[data-testid="stAppViewContainer"], .stApp { background:
+   radial-gradient(1200px 520px at 100% -10%, rgba(24,90,99,.28), transparent),
+   radial-gradient(900px 420px at -10% 0%, rgba(214,179,90,.08), transparent),
+   var(--bg); }
 [data-testid="stHeader"] { background:transparent; }
-.block-container { padding-top:2.7rem; padding-bottom:3.5rem; max-width:1220px; animation:fadeInUp .5s ease both; }
-.block-container p { line-height:1.65; color:var(--ink); }
-.block-container li { line-height:1.6; }
-h1,h2,h3,h4 { font-family:'Playfair Display',Georgia,serif; color:var(--navy); letter-spacing:.2px; }
+.block-container { padding-top:2.6rem; padding-bottom:3.5rem; max-width:1240px; animation:fadeInUp .5s ease both; }
+.block-container p, .block-container li { line-height:1.65; color:var(--ink); }
+h1,h2,h3,h4 { font-family:'Playfair Display',Georgia,serif; color:var(--ink); letter-spacing:.2px; }
+h2 { font-size:1.35rem; margin:1.9rem 0 .7rem; }
+hr { border-color:var(--line); }
+a { color:var(--gold-2); }
 
 @keyframes fadeInUp { from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;} }
 @keyframes floatIn { from{opacity:0; transform:translateY(18px) scale(.985);} to{opacity:1; transform:none;} }
-@keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(192,57,43,.4);} 70%{box-shadow:0 0 0 12px rgba(192,57,43,0);} 100%{box-shadow:0 0 0 0 rgba(192,57,43,0);} }
+@keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(201,104,104,.5);} 70%{box-shadow:0 0 0 12px rgba(201,104,104,0);} 100%{box-shadow:0 0 0 0 rgba(201,104,104,0);} }
+@keyframes sheen { 0%{background-position:-380px 0;} 100%{background-position:380px 0;} }
+/* Staggered reveal of cards laid out in columns */
+[data-testid="stHorizontalBlock"] [data-testid="column"] { animation:floatIn .5s ease both; }
+[data-testid="stHorizontalBlock"] [data-testid="column"]:nth-child(2){ animation-delay:.06s; }
+[data-testid="stHorizontalBlock"] [data-testid="column"]:nth-child(3){ animation-delay:.12s; }
+[data-testid="stHorizontalBlock"] [data-testid="column"]:nth-child(4){ animation-delay:.18s; }
 
-.hero { position:relative; overflow:hidden; border-radius:20px; padding:2.1rem 2.3rem;
-  background:linear-gradient(120deg,#0c223d 0%, var(--navy) 45%, var(--navy-2) 100%);
-  color:#fff; box-shadow:0 18px 46px rgba(15,42,74,.30); margin:.2rem 0 1.4rem; animation:floatIn .6s ease both; }
-.hero:after { content:""; position:absolute; right:-70px; top:-70px; width:250px; height:250px; border-radius:50%;
-  background:radial-gradient(circle, rgba(201,162,39,.30), transparent 70%); }
-.hero:before { content:""; position:absolute; left:-50px; bottom:-90px; width:220px; height:220px; border-radius:50%;
-  background:radial-gradient(circle, rgba(255,255,255,.05), transparent 70%); }
-.hero .eyebrow { text-transform:uppercase; letter-spacing:3px; font-size:.72rem; color:var(--gold-2); font-weight:700; }
-.hero h1 { color:#fff; margin:.35rem 0 .2rem; font-size:2.15rem; line-height:1.12; font-weight:800; }
-.hero .accent { width:70px; height:4px; border-radius:3px; background:var(--gold); margin:.7rem 0 .8rem; }
-.hero p { color:rgba(255,255,255,.9); margin:0; font-size:1.02rem; max-width:820px; }
-.hero .badges { margin-top:1rem; display:flex; gap:.5rem; flex-wrap:wrap; }
-.hero .badge { display:inline-flex; align-items:center; gap:.4rem; background:rgba(255,255,255,.1);
-  border:1px solid rgba(230,198,92,.35); color:#fff; padding:.32rem .8rem; border-radius:999px; font-size:.78rem; font-weight:600; }
+/* ---- Hero ---- */
+.hero { position:relative; overflow:hidden; border-radius:22px; padding:2.2rem 2.4rem;
+  background:linear-gradient(125deg,#071627 0%, #0c2a3a 55%, var(--teal) 140%);
+  border:1px solid rgba(214,179,90,.18); box-shadow:0 22px 55px rgba(0,0,0,.45);
+  margin:.2rem 0 1.5rem; animation:floatIn .6s ease both; }
+.hero:before { content:""; position:absolute; inset:0; opacity:.5;
+  background-image:linear-gradient(rgba(143,161,174,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(143,161,174,.05) 1px,transparent 1px);
+  background-size:34px 34px; mask-image:radial-gradient(600px 300px at 85% 0%, #000, transparent 75%); }
+.hero:after { content:""; position:absolute; right:-70px; top:-70px; width:270px; height:270px; border-radius:50%;
+  background:radial-gradient(circle, rgba(214,179,90,.28), transparent 70%); }
+.hero > * { position:relative; z-index:1; }
+.hero .eyebrow { text-transform:uppercase; letter-spacing:3.5px; font-size:.7rem; color:var(--gold-2); font-weight:800; }
+.hero h1 { color:#fff; margin:.4rem 0 .2rem; font-size:2.25rem; line-height:1.1; font-weight:800; }
+.hero h1 em { font-style:italic; color:var(--gold-2); }
+.hero .accent { width:72px; height:4px; border-radius:3px; background:var(--gold); margin:.75rem 0 .85rem; }
+.hero p { color:rgba(245,243,237,.82); margin:0; font-size:1.03rem; max-width:840px; }
+.hero .badges { margin-top:1.1rem; display:flex; gap:.55rem; flex-wrap:wrap; }
+.hero .badge { display:inline-flex; align-items:center; gap:.45rem; background:rgba(18,58,70,.55);
+  border:1px solid rgba(214,179,90,.35); color:#fff; padding:.36rem .85rem; border-radius:999px; font-size:.78rem; font-weight:600;
+  backdrop-filter:blur(4px); transition:transform .2s ease, border-color .2s ease; }
+.hero .badge:hover { transform:translateY(-2px); border-color:var(--gold); }
 
-.lca-card { background:var(--card); border:1px solid var(--ring); border-radius:16px; padding:1.2rem 1.3rem;
-  box-shadow:0 8px 22px rgba(15,42,74,.07); transition:transform .2s ease, box-shadow .2s ease; animation:floatIn .5s ease both; height:100%; }
-.lca-card:hover { transform:translateY(-4px); box-shadow:0 18px 36px rgba(15,42,74,.14); }
-.lca-card .ic { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;
-  background:linear-gradient(135deg, rgba(28,74,126,.12), rgba(201,162,39,.14)); margin-bottom:.4rem; }
-.lca-card h3 { margin:.4rem 0 .35rem; font-size:1.18rem; }
+/* ---- Cards ---- */
+.lca-card { background:var(--card); border:1px solid var(--ring); border-radius:18px; padding:1.3rem 1.35rem;
+  box-shadow:0 10px 26px rgba(0,0,0,.28); transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease; height:100%; }
+.lca-card:hover { transform:translateY(-5px); box-shadow:0 22px 44px rgba(0,0,0,.4); border-color:rgba(214,179,90,.4); }
+.lca-card .ic { width:46px; height:46px; border-radius:13px; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg, rgba(24,90,99,.5), rgba(214,179,90,.16)); border:1px solid var(--ring); margin-bottom:.5rem; }
+.lca-card h3 { margin:.5rem 0 .35rem; font-size:1.18rem; color:var(--ink); }
 
-.stat { background:var(--card); border:1px solid var(--ring); border-radius:16px; padding:1.1rem 1.2rem;
-  box-shadow:0 8px 22px rgba(15,42,74,.07); position:relative; overflow:hidden; height:100%; transition:transform .2s ease; animation:floatIn .5s ease both; }
-.stat:hover { transform:translateY(-4px); }
-.stat .v { font-family:'Playfair Display',serif; font-size:2rem; font-weight:800; color:var(--navy); line-height:1; }
-.stat .l { color:var(--muted); font-size:.85rem; margin-top:.35rem; font-weight:500; }
-.stat .ic { position:absolute; right:.9rem; top:.85rem; opacity:.85; }
-.stat.gold { border-top:3px solid var(--gold); }
+/* ---- Stat tiles ---- */
+.stat { background:linear-gradient(180deg, var(--card), #0b1d2e); border:1px solid var(--ring); border-radius:18px;
+  padding:1.15rem 1.25rem; box-shadow:0 10px 26px rgba(0,0,0,.28); position:relative; overflow:hidden;
+  min-height:118px; display:flex; flex-direction:column; justify-content:center; transition:transform .22s ease, border-color .22s ease; }
+.stat:hover { transform:translateY(-5px); border-color:rgba(214,179,90,.4); }
+.stat .v { font-family:'Playfair Display',serif; font-size:2.1rem; font-weight:800; color:#fff; line-height:1; }
+.stat .v.sm { font-size:1.5rem; letter-spacing:.3px; }
+.stat .l { color:var(--muted); font-size:.84rem; margin-top:.45rem; font-weight:500; }
+.stat .ic { position:absolute; right:1rem; top:1rem; opacity:.9; }
+.stat.gold { border-top:2px solid var(--gold); }
 
+/* ---- Streamlit metric widgets ---- */
 [data-testid="stMetric"] { background:var(--card); border:1px solid var(--ring); border-radius:16px; padding:1rem 1.15rem;
-  box-shadow:0 8px 22px rgba(15,42,74,.07); transition:transform .2s ease; }
+  box-shadow:0 10px 26px rgba(0,0,0,.26); transition:transform .2s ease; }
 [data-testid="stMetric"]:hover { transform:translateY(-3px); }
-[data-testid="stMetricValue"] { color:var(--navy); font-weight:700; }
+[data-testid="stMetricValue"] { color:#fff; font-weight:800; }
+[data-testid="stMetricLabel"] { color:var(--muted); }
 
-.finding-card { background:var(--card); border:1px solid var(--ring); border-left:5px solid #ccc; border-radius:13px;
-  padding:.85rem 1.1rem; margin-bottom:.75rem; box-shadow:0 5px 16px rgba(15,42,74,.05); transition:transform .18s ease; animation:floatIn .45s ease both; }
-.finding-card:hover { transform:translateX(3px); }
-.sev-tag { color:#fff; font-size:.68rem; font-weight:800; letter-spacing:.5px; padding:.12rem .5rem; border-radius:5px; margin-right:.5rem; }
+/* ---- Findings ---- */
+.finding-card { background:var(--card); border:1px solid var(--ring); border-left:5px solid #555; border-radius:14px;
+  padding:.9rem 1.1rem; margin-bottom:.75rem; box-shadow:0 8px 20px rgba(0,0,0,.25); transition:transform .18s ease; animation:floatIn .45s ease both; }
+.finding-card:hover { transform:translateX(4px); }
+.finding-card strong { color:var(--ink); }
+.sev-tag { color:#0a1622; font-size:.66rem; font-weight:800; letter-spacing:.5px; padding:.14rem .55rem; border-radius:6px; margin-right:.5rem; }
 .sev-high-pulse { animation:pulse 2.2s infinite; }
-.evidence { background:rgba(15,42,74,.05); border-radius:7px; padding:.45rem .65rem; font-size:.8rem;
-  font-family:ui-monospace,Menlo,monospace; color:#42505f; margin-top:.45rem; border-left:3px solid var(--gold); overflow-wrap:anywhere; }
+.evidence { background:rgba(24,90,99,.2); border-radius:8px; padding:.5rem .7rem; font-size:.8rem;
+  font-family:ui-monospace,Menlo,monospace; color:#cfe0e4; margin-top:.5rem; border-left:3px solid var(--gold); overflow-wrap:anywhere; }
 
-.pill { display:inline-block; padding:.28rem .7rem; border-radius:999px; font-weight:700; font-size:.8rem; color:#fff; }
-.tag { display:inline-block; padding:.2rem .6rem; border-radius:8px; font-size:.75rem; background:rgba(28,74,126,.1); color:var(--navy-2); margin:.14rem; font-weight:600; }
+/* ---- Pills / tags ---- */
+.pill { display:inline-block; padding:.3rem .75rem; border-radius:999px; font-weight:800; font-size:.78rem; color:#0a1622; }
+.tag { display:inline-block; padding:.22rem .62rem; border-radius:8px; font-size:.74rem; background:rgba(24,90,99,.4);
+  color:var(--gold-2); margin:.14rem; font-weight:600; border:1px solid var(--ring); }
 .risk-box { text-align:center; }
-.risk-box .lbl { font-size:.7rem; letter-spacing:1.5px; color:var(--muted); text-transform:uppercase; margin-bottom:.35rem; }
-.risk-box .val { display:inline-block; padding:.5rem 1.1rem; border-radius:12px; color:#fff; font-weight:700; font-size:1.05rem; }
+.risk-box .lbl { font-size:.68rem; letter-spacing:1.6px; color:var(--muted); text-transform:uppercase; margin-bottom:.4rem; }
+.risk-box .val { display:inline-block; padding:.55rem 1.15rem; border-radius:13px; color:#0a1622; font-weight:800; font-size:1.05rem; box-shadow:0 8px 20px rgba(0,0,0,.3); }
 
-.step { background:var(--card); border:1px solid var(--ring); border-radius:16px; padding:1.15rem 1.2rem; height:100%;
-  box-shadow:0 8px 22px rgba(15,42,74,.06); animation:floatIn .5s ease both; transition:transform .2s ease; }
-.step:hover { transform:translateY(-4px); }
-.step .num { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%;
-  background:linear-gradient(135deg,var(--navy),var(--navy-2)); color:var(--gold-2); font-weight:800; font-family:'Playfair Display',serif; }
-.step h4 { margin:.6rem 0 .3rem; } .step p { color:var(--muted); font-size:.9rem; margin:0; }
+/* ---- Workflow steps ---- */
+.step { background:var(--card); border:1px solid var(--ring); border-radius:18px; padding:1.2rem 1.25rem; height:100%;
+  box-shadow:0 10px 26px rgba(0,0,0,.26); transition:transform .22s ease, border-color .22s ease; }
+.step:hover { transform:translateY(-5px); border-color:rgba(214,179,90,.4); }
+.step .num { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%;
+  background:linear-gradient(135deg,var(--teal),var(--card2)); color:var(--gold-2); font-weight:800; font-family:'Playfair Display',serif; border:1px solid var(--ring); }
+.step h4 { margin:.65rem 0 .3rem; color:var(--ink); } .step p { color:var(--muted); font-size:.9rem; margin:0; }
 
-section[data-testid="stSidebar"] { background:linear-gradient(190deg,#123457 0%, var(--navy) 55%, #0a1d34 100%); border-right:1px solid rgba(201,162,39,.28); }
-section[data-testid="stSidebar"] * { color:#dbe6f2; }
+/* ---- Sidebar ---- */
+section[data-testid="stSidebar"] { background:linear-gradient(195deg,#0a2230 0%, #08192a 60%, #061320 100%); border-right:1px solid rgba(214,179,90,.22); }
+section[data-testid="stSidebar"] * { color:#cddbe4; }
 .brand { display:flex; align-items:center; gap:.7rem; padding:.2rem 0 .1rem; }
-.brand .name { font-family:'Playfair Display',serif; color:#fff; font-size:1.2rem; font-weight:800; line-height:1.05; }
-.brand .name small { display:block; color:var(--gold-2); font-size:.6rem; letter-spacing:2.5px; text-transform:uppercase; font-family:'Inter',sans-serif; font-weight:700; margin-top:3px; }
-section[data-testid="stSidebar"] hr { border-color:rgba(255,255,255,.12); margin:.7rem 0; }
-/* nav buttons — one aligned line each, left-aligned so icons form a column */
+.brand .name { font-family:'Playfair Display',serif; color:#fff; font-size:1.22rem; font-weight:800; line-height:1.05; }
+.brand .name small { display:block; color:var(--gold-2); font-size:.6rem; letter-spacing:2.6px; text-transform:uppercase; font-family:'Manrope',sans-serif; font-weight:700; margin-top:3px; }
+section[data-testid="stSidebar"] hr { border-color:rgba(143,161,174,.16); margin:.7rem 0; }
 section[data-testid="stSidebar"] .stButton>button { justify-content:flex-start !important; text-align:left !important;
-  border:none; background:transparent; color:#cdd9e8; font-weight:600; border-left:3px solid transparent; border-radius:10px;
-  padding:.55rem .95rem; box-shadow:none; white-space:nowrap; overflow:hidden; gap:.7rem !important; }
+  border:none; background:transparent; color:#c3d2dc; font-weight:600; border-left:3px solid transparent; border-radius:10px;
+  padding:.58rem .95rem; box-shadow:none; white-space:nowrap; overflow:hidden; gap:.7rem !important; transition:all .18s ease; }
 section[data-testid="stSidebar"] .stButton>button > * { justify-content:flex-start !important; }
 section[data-testid="stSidebar"] .stButton>button p,
 section[data-testid="stSidebar"] .stButton>button div,
 section[data-testid="stSidebar"] .stButton>button span { white-space:nowrap; margin:0; text-align:left !important; }
-section[data-testid="stSidebar"] .stButton>button:hover { background:rgba(255,255,255,.08); transform:translateX(2px); color:#fff; border-color:transparent; }
-section[data-testid="stSidebar"] .stButton>button[kind="primary"] { background:rgba(201,162,39,.16); color:#fff; border-left-color:var(--gold); }
-.side-stat { display:flex; align-items:center; gap:.45rem; background:rgba(255,255,255,.06); border:1px solid rgba(201,162,39,.22);
-  border-radius:11px; padding:.5rem .75rem; font-size:.82rem; margin-top:.45rem; }
+section[data-testid="stSidebar"] .stButton>button:hover { background:rgba(24,90,99,.35); transform:translateX(3px); color:#fff; }
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] { background:linear-gradient(90deg,rgba(214,179,90,.2),rgba(24,90,99,.2)); color:#fff; border-left-color:var(--gold); }
+.side-stat { display:flex; align-items:center; gap:.5rem; background:rgba(18,58,70,.4); border:1px solid rgba(214,179,90,.2);
+  border-radius:11px; padding:.55rem .75rem; font-size:.82rem; margin-top:.5rem; }
 
-.stButton>button, .stDownloadButton>button { border-radius:11px; font-weight:600; border:1px solid var(--ring); transition:all .18s ease; }
-.stButton>button:hover, .stDownloadButton>button:hover { transform:translateY(-2px); border-color:var(--gold); box-shadow:0 8px 18px rgba(15,42,74,.14); }
-.stButton>button[kind="primary"] { background:var(--navy); border-color:var(--navy); color:#fff; }
-.stButton>button[kind="primary"]:hover { background:var(--navy-2); }
+/* ---- Buttons ---- */
+.stButton>button, .stDownloadButton>button { border-radius:12px; font-weight:700; background:var(--card2); color:var(--ink);
+  border:1px solid var(--ring); transition:all .18s ease; }
+.stButton>button:hover, .stDownloadButton>button:hover { transform:translateY(-2px); border-color:var(--gold);
+  box-shadow:0 8px 22px rgba(214,179,90,.22); color:#fff; }
+.stButton>button[kind="primary"] { background:linear-gradient(135deg,var(--gold),#c79f45); border:none; color:#0a1622; }
+.stButton>button[kind="primary"]:hover { box-shadow:0 10px 26px rgba(214,179,90,.4); filter:brightness(1.05); }
 
-.stTabs [data-baseweb="tab-list"] { gap:.3rem; }
-.stTabs [data-baseweb="tab"] { border-radius:11px 11px 0 0; padding:.4rem .9rem; }
-.stTabs [aria-selected="true"] { background:rgba(28,74,126,.1); color:var(--navy); }
+/* ---- Inputs / widgets ---- */
+[data-testid="stTextInput"] input, [data-baseweb="select"] > div, [data-testid="stNumberInput"] input,
+textarea, [data-baseweb="input"] { background:var(--card) !important; border-color:var(--line) !important; color:var(--ink) !important; }
+[data-testid="stTextInput"] input:focus { border-color:var(--gold) !important; box-shadow:0 0 0 2px rgba(214,179,90,.25) !important; }
+[data-testid="stWidgetLabel"] p, label p { color:var(--muted) !important; }
 
+/* ---- File uploader — premium drop zone ---- */
+[data-testid="stFileUploaderDropzone"] { background:linear-gradient(180deg,var(--card),#0a1c2c);
+  border:2px dashed rgba(214,179,90,.4); border-radius:16px; padding:2rem 1.5rem; transition:all .25s ease; }
+[data-testid="stFileUploaderDropzone"]:hover { border-color:var(--gold); background:linear-gradient(180deg,#10293c,#0a1c2c);
+  box-shadow:0 0 0 4px rgba(214,179,90,.12), 0 14px 34px rgba(0,0,0,.4); transform:translateY(-2px); }
+[data-testid="stFileUploaderDropzone"] * { color:var(--ink) !important; }
+[data-testid="stFileUploaderDropzone"] small { color:var(--muted) !important; }
+
+/* ---- Tabs ---- */
+.stTabs [data-baseweb="tab-list"] { gap:.3rem; border-bottom:1px solid var(--line); }
+.stTabs [data-baseweb="tab"] { border-radius:11px 11px 0 0; padding:.45rem 1rem; color:var(--muted); }
+.stTabs [aria-selected="true"] { background:rgba(24,90,99,.35); color:var(--gold-2); }
+
+/* ---- Expander / status / dataframe ---- */
+[data-testid="stExpander"] { background:var(--card); border:1px solid var(--ring); border-radius:14px; }
+[data-testid="stExpander"] summary:hover { color:var(--gold-2); }
+[data-testid="stDataFrame"] { border:1px solid var(--ring); border-radius:12px; }
+
+/* ---- Flashcards ---- */
 .flip-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); gap:1.1rem; }
-.flip-card { perspective:1300px; height:210px; }
+.flip-card { perspective:1300px; height:212px; }
 .flip-inner { position:relative; width:100%; height:100%; transition:transform .75s cubic-bezier(.4,.2,.2,1); transform-style:preserve-3d; }
 .flip-card:hover .flip-inner { transform:rotateY(180deg); }
-.flip-front, .flip-back { position:absolute; inset:0; backface-visibility:hidden; border-radius:17px; padding:1.15rem;
-  display:flex; flex-direction:column; justify-content:center; box-shadow:0 10px 26px rgba(15,42,74,.16); }
-.flip-front { background:linear-gradient(140deg,var(--navy),var(--navy-2)); color:#fff; }
+.flip-front, .flip-back { position:absolute; inset:0; backface-visibility:hidden; border-radius:17px; padding:1.2rem;
+  display:flex; flex-direction:column; justify-content:center; box-shadow:0 12px 30px rgba(0,0,0,.4); }
+.flip-front { background:linear-gradient(140deg,var(--card2),var(--teal)); color:#fff; border:1px solid var(--ring); }
 .flip-front .q { font-family:'Playfair Display',serif; font-size:1.08rem; font-weight:700; }
-.flip-front .cat { position:absolute; top:.75rem; right:.85rem; font-size:.62rem; color:var(--gold-2); text-transform:uppercase; letter-spacing:1.5px; font-weight:800; }
-.flip-front .hint { position:absolute; bottom:.75rem; left:1.15rem; font-size:.7rem; color:rgba(255,255,255,.6); }
-.flip-back { background:var(--card); color:var(--ink); transform:rotateY(180deg); border:1px solid var(--gold); font-size:.9rem; line-height:1.48; overflow:auto; }
+.flip-front .cat { position:absolute; top:.8rem; right:.9rem; font-size:.62rem; color:var(--gold-2); text-transform:uppercase; letter-spacing:1.5px; font-weight:800; }
+.flip-front .hint { position:absolute; bottom:.8rem; left:1.2rem; font-size:.7rem; color:rgba(245,243,237,.6); }
+.flip-back { background:var(--card); color:var(--ink); transform:rotateY(180deg); border:1px solid var(--gold); font-size:.9rem; line-height:1.5; overflow:auto; }
 
-.reader-head { background:linear-gradient(120deg,var(--navy),var(--navy-2)); color:#fff; border-radius:16px; padding:1.6rem 1.9rem;
-  position:relative; overflow:hidden; box-shadow:0 12px 30px rgba(15,42,74,.22); margin-bottom:1.3rem; animation:floatIn .5s ease both; }
-.reader-head:after { content:""; position:absolute; right:-40px; top:-40px; width:160px; height:160px; border-radius:50%;
-  background:radial-gradient(circle,rgba(201,162,39,.3),transparent 70%); }
+/* ---- Article reader ---- */
+.reader-head { background:linear-gradient(120deg,#0c2a3a,var(--teal)); color:#fff; border-radius:18px; padding:1.7rem 2rem;
+  position:relative; overflow:hidden; box-shadow:0 16px 36px rgba(0,0,0,.4); border:1px solid var(--ring); margin-bottom:1.4rem; animation:floatIn .5s ease both; }
+.reader-head:after { content:""; position:absolute; right:-40px; top:-40px; width:170px; height:170px; border-radius:50%;
+  background:radial-gradient(circle,rgba(214,179,90,.3),transparent 70%); }
 .reader-head h2 { color:#fff; margin:.35rem 0 .3rem; } .reader-head .meta { color:var(--gold-2); font-size:.82rem; font-weight:600; }
 .article-wrap { max-width:820px; }
-.article-wrap p, .article-wrap li { font-size:1rem; line-height:1.75; color:#26333f; }
-.article-wrap h4 { margin-top:1.4rem; color:var(--navy); }
-.article-wrap p:first-of-type:first-letter { font-family:'Playfair Display',serif; font-size:2.6rem; font-weight:800; color:var(--navy-2); float:left; line-height:.8; margin:.15rem .55rem 0 0; }
+.article-wrap p, .article-wrap li { font-size:1.02rem; line-height:1.8; color:#dbe3e8; }
+.article-wrap h4 { margin-top:1.5rem; color:var(--gold-2); }
+.article-wrap strong { color:var(--ink); }
+.article-wrap p:first-of-type:first-letter { font-family:'Playfair Display',serif; font-size:2.8rem; font-weight:800; color:var(--gold); float:left; line-height:.8; margin:.15rem .6rem 0 0; }
 
 ::-webkit-scrollbar { width:10px; height:10px; }
-::-webkit-scrollbar-thumb { background:rgba(15,42,74,.28); border-radius:6px; }
-::-webkit-scrollbar-thumb:hover { background:rgba(15,42,74,.45); }
+::-webkit-scrollbar-thumb { background:rgba(214,179,90,.3); border-radius:6px; }
+::-webkit-scrollbar-thumb:hover { background:rgba(214,179,90,.5); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, .hero, .lca-card, .stat, .step, [data-testid="column"] { animation:none !important; transition:none !important; }
+}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -245,31 +312,35 @@ def hero(eyebrow: str, title: str, subtitle: str, badges: list[tuple[str, str]] 
         unsafe_allow_html=True)
 
 
-def stat_tile(value, label: str, icon_name: str, gold: bool = False) -> str:
+def stat_tile(value, label: str, icon_name: str, gold: bool = False, small: bool = False) -> str:
     cls = "stat gold" if gold else "stat"
-    col = GOLD if gold else NAVY_2
+    col = GOLD if gold else GOLD_2
+    vcls = "v sm" if small else "v"
     return (f"<div class='{cls}'><div class='ic'>{icon(icon_name, 22, col)}</div>"
-            f"<div class='v'>{safe(value)}</div><div class='l'>{safe(label)}</div></div>")
+            f"<div class='{vcls}'>{safe(value)}</div><div class='l'>{safe(label)}</div></div>")
 
 
 def _theme_fig(fig: go.Figure, height: int = 320) -> go.Figure:
     fig.update_layout(height=height, margin=dict(l=10, r=10, t=48, b=10),
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(family="Inter, sans-serif", color="#1c2733"),
-                      title_font=dict(family="Playfair Display, serif", color=NAVY, size=16),
-                      legend=dict(orientation="h", yanchor="bottom", y=-0.25))
+                      font=dict(family="Manrope, sans-serif", color=INK),
+                      title_font=dict(family="Playfair Display, serif", color=GOLD_2, size=16),
+                      legend=dict(orientation="h", yanchor="bottom", y=-0.25, font=dict(color=INK)))
+    fig.update_xaxes(gridcolor="rgba(143,161,174,.12)", zerolinecolor="rgba(143,161,174,.2)", color=SLATE)
+    fig.update_yaxes(gridcolor="rgba(143,161,174,.12)", zerolinecolor="rgba(143,161,174,.2)", color=SLATE)
     return fig
 
 
 def risk_gauge(score: int, level: str) -> go.Figure:
-    color = LEVEL_COLORS.get(level, NAVY)
+    color = LEVEL_COLORS.get(level, GOLD)
     fig = go.Figure(go.Indicator(
-        mode="gauge+number", value=score, number={"suffix": "/100", "font": {"size": 30, "color": NAVY}},
-        gauge={"axis": {"range": [0, 100], "tickcolor": SLATE}, "bar": {"color": color, "thickness": 0.3}, "borderwidth": 0,
-               "steps": [{"range": [0, 25], "color": "rgba(30,132,73,.18)"}, {"range": [25, 55], "color": "rgba(214,137,16,.18)"},
-                         {"range": [55, 100], "color": "rgba(192,57,43,.18)"}],
+        mode="gauge+number", value=score, number={"suffix": "/100", "font": {"size": 32, "color": INK}},
+        gauge={"axis": {"range": [0, 100], "tickcolor": SLATE, "tickfont": {"color": SLATE}},
+               "bar": {"color": color, "thickness": 0.32}, "borderwidth": 0, "bgcolor": "rgba(255,255,255,.04)",
+               "steps": [{"range": [0, 25], "color": "rgba(95,191,143,.22)"}, {"range": [25, 55], "color": "rgba(217,164,65,.22)"},
+                         {"range": [55, 100], "color": "rgba(201,104,104,.22)"}],
                "threshold": {"line": {"color": color, "width": 4}, "value": score}},
-        title={"text": f"<b>{level} risk</b>"}))
+        title={"text": f"<b style='color:{INK}'>{level} risk</b>"}))
     return _theme_fig(fig, 250)
 
 
@@ -360,8 +431,8 @@ def page_dashboard() -> None:
         cols = st.columns(4)
         cols[0].markdown(stat_tile(acc, "Clause recognition accuracy", "target", gold=True), unsafe_allow_html=True)
         cols[1].markdown(stat_tile(ncls, "Clause types recognized", "layers"), unsafe_allow_html=True)
-        cols[2].markdown(stat_tile("Seconds", "To analyze a contract", "clock"), unsafe_allow_html=True)
-        cols[3].markdown(stat_tile("0–100", "Clear risk score every time", "shield"), unsafe_allow_html=True)
+        cols[2].markdown(stat_tile("Seconds", "Average analysis time", "clock", small=True), unsafe_allow_html=True)
+        cols[3].markdown(stat_tile("0–100", "Risk scored on every contract", "shield", small=True), unsafe_allow_html=True)
 
         st.markdown("### From document to decision in three steps")
         steps = [("1", "Upload", "Add a PDF or Word contract. The text is read and organized for you."),
@@ -370,15 +441,15 @@ def page_dashboard() -> None:
         for col, (n, t, d) in zip(st.columns(3), steps):
             col.markdown(f"<div class='step'><span class='num'>{n}</span><h4>{safe(t)}</h4><p>{safe(d)}</p></div>", unsafe_allow_html=True)
 
-        st.markdown("### Built to solve real review problems")
-        solves = [("clock", "Cut review time", "Turn hours of careful reading into a structured first pass that takes minutes."),
-                  ("alert", "Catch hidden risk", "Surface one-sided terms, uncapped liability and auto-renewals — and the protections that are missing."),
-                  ("search", "Never lose a clause", "Search every contract you've reviewed to find precedents and compare language instantly.")]
+        st.markdown("### Why review teams choose ClauseLens")
+        solves = [("clock", "Faster first-pass review", "Hours of careful reading become a structured review that takes minutes — without losing rigour."),
+                  ("shield", "Risk surfaced, not missed", "One-sided terms, uncapped liability and auto-renewals are flagged — along with the protections that are absent."),
+                  ("search", "Institutional memory", "Every reviewed contract stays searchable, so precedents and standard language are always a query away.")]
         for col, (ic, t, d) in zip(st.columns(3), solves):
-            col.markdown(f"<div class='lca-card'><div class='ic'>{icon(ic, 22, NAVY_2)}</div><h3>{safe(t)}</h3>"
+            col.markdown(f"<div class='lca-card'><div class='ic'>{icon(ic, 22, GOLD_2)}</div><h3>{safe(t)}</h3>"
                          f"<div style='color:var(--muted)'>{safe(d)}</div></div>", unsafe_allow_html=True)
         st.markdown("<div style='height:.6rem'></div>", unsafe_allow_html=True)
-        st.info("Open **Analyze Contract** from the menu and try the sample in `sample_contracts/` to see it in action.")
+        st.info("Head to **Analyze Contract** and upload one of your agreements — watch ClauseLens reveal the clauses, key terms and risks in seconds.")
         return
 
     df = pd.DataFrame(contracts)
@@ -424,7 +495,8 @@ def page_analyze(use_ml: bool) -> None:
     uploaded = st.file_uploader(f"Drop a contract here — PDF or Word, up to {MAX_UPLOAD_BYTES // (1024*1024)} MB",
                                 type=["pdf", "docx"], key="uploader")
     if uploaded is None:
-        st.info("Upload a contract to begin, or try `sample_contracts/sample_services_agreement.docx`.")
+        st.info("Drop in one of your agreements above — ClauseLens reads it end to end and shows you the "
+                "clauses, key terms, and exactly where the risk sits.")
         return
 
     data = uploaded.getvalue()
@@ -435,14 +507,21 @@ def page_analyze(use_ml: bool) -> None:
 
     sig = (uploaded.name, uploaded.size, use_ml)
     if st.session_state.get("analysis_sig") != sig:
-        with st.spinner("Reading and analyzing the contract…"):
-            try:
+        try:
+            with st.status("Analyzing contract…", expanded=True) as status:
+                stages = ["Reading document", "Extracting text", "Identifying clauses",
+                          "Extracting key terms", "Assessing risk"]
+                for s in stages:
+                    st.markdown(f"<span style='color:#8FA1AE'>›</span> {s}…", unsafe_allow_html=True)
+                    time.sleep(0.16)
                 st.session_state["analysis"] = analyze_upload(uploaded, use_ml=use_ml)
-                st.session_state["analysis_sig"] = sig
-                st.session_state["saved_id"] = None
-            except Exception as e:  # noqa: BLE001
-                st.error(f"Sorry — this file couldn't be processed: {safe(e)}")
-                return
+                st.markdown("<span style='color:#5FBF8F'>✓</span> Report ready", unsafe_allow_html=True)
+                status.update(label="Analysis complete", state="complete", expanded=False)
+            st.session_state["analysis_sig"] = sig
+            st.session_state["saved_id"] = None
+        except Exception as e:  # noqa: BLE001
+            st.error(f"Sorry — this file couldn't be processed: {safe(e)}")
+            return
 
     result: AnalysisResult = st.session_state["analysis"]
     if result.meta.get("likely_scanned"):
@@ -618,7 +697,7 @@ def page_search() -> None:
             f"<div class='lca-card' style='margin-bottom:.8rem'>"
             f"<div style='display:flex;justify-content:space-between;align-items:center;gap:.5rem'>"
             f"<div><strong>{safe(r.heading or '(no heading)')}</strong> <span class='tag'>{safe(r.clause_type or 'unclassified')}</span></div>"
-            f"<span class='pill' style='background:{NAVY_2}'>match {r.score:.0%}</span></div>"
+            f"<span class='pill' style='background:{GOLD}'>match {r.score:.0%}</span></div>"
             f"<div style='color:var(--muted); font-size:.8rem; margin:.3rem 0; display:flex; align-items:center; gap:.35rem'>"
             f"{icon('file', 14, SLATE)} {safe(r.filename)}</div>"
             f"<div style='color:var(--ink)'>{clean_display(r.text, 400)}</div></div>", unsafe_allow_html=True)

@@ -45,7 +45,7 @@ from sklearn.metrics import (
     classification_report,
     f1_score,
 )
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.svm import LinearSVC
 
 import joblib
@@ -66,26 +66,31 @@ def _load_splits(data_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFra
 def _build_pipeline(estimator) -> Pipeline:
     """TF-IDF features + a linear classifier.
 
-    The vectorizer settings are tuned for legal prose: word 1-2 grams catch
-    phrases like "governing law" / "hold harmless"; sublinear_tf dampens the
-    effect of very long clauses; min_df=2 drops one-off OCR noise.
+    Features are a union of word and character n-grams:
+      - word 1-2 grams catch phrases like "governing law" / "hold harmless";
+      - char_wb 3-5 grams add robustness to legal morphology, hyphenation and
+        minor OCR noise, and measurably improve balanced (macro-F1) accuracy.
+    sublinear_tf dampens very long clauses; min_df=2 drops one-off noise.
     """
-    return Pipeline(
+    features = FeatureUnion(
         [
             (
-                "tfidf",
+                "word",
                 TfidfVectorizer(
-                    ngram_range=(1, 2),
-                    min_df=2,
-                    max_features=50_000,
-                    sublinear_tf=True,
-                    strip_accents="unicode",
-                    lowercase=True,
+                    ngram_range=(1, 2), min_df=2, max_features=60_000,
+                    sublinear_tf=True, strip_accents="unicode", lowercase=True,
                 ),
             ),
-            ("clf", estimator),
+            (
+                "char",
+                TfidfVectorizer(
+                    analyzer="char_wb", ngram_range=(3, 5), min_df=2,
+                    max_features=60_000, sublinear_tf=True,
+                ),
+            ),
         ]
     )
+    return Pipeline([("tfidf", features), ("clf", estimator)])
 
 
 def _candidate_models() -> dict[str, Pipeline]:

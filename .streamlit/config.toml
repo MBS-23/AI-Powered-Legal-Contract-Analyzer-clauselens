@@ -1,9 +1,9 @@
 [theme]
-base = "light"
-primaryColor = "#c9a227"          # gold accent
-backgroundColor = "#eef2f7"       # soft slate (not pure white)
-secondaryBackgroundColor = "#ffffff"
-textColor = "#1f2933"
+base = "dark"
+primaryColor = "#D6B35A"          # gold accent
+backgroundColor = "#071525"       # deep navy
+secondaryBackgroundColor = "#0D2235"
+textColor = "#F5F3ED"             # off-white
 font = "sans serif"
 
 [server]
