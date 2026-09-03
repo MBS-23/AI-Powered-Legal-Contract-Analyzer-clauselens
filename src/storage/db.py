@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.security import clean_text_input, MAX_TEXT_CHARS
+
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "data" / "contracts.db"
 
 
@@ -107,6 +109,12 @@ def save_contract(
     (section_number, heading, clause_type, confidence, method, text).
     """
     init_db(db_path)
+    # Defense-in-depth: bound the free-text fields (filename/summary/full_text)
+    # before storage — strips control chars and hard-caps length. All values
+    # are still written via parameterized queries (no SQL injection surface).
+    filename = clean_text_input(filename, max_chars=300) or "contract"
+    summary = clean_text_input(summary) if summary else summary
+    full_text = clean_text_input(full_text, max_chars=MAX_TEXT_CHARS) if full_text else full_text
     with _connect(db_path) as conn:
         cur = conn.execute(
             """

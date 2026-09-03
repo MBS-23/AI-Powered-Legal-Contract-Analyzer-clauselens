@@ -24,7 +24,10 @@ GPU, no paid API, no data leaves the machine. Designed to deploy to
 | **Summaries** | A fact-based plain-English overview + an extractive (TF-IDF centrality) key-points summary |
 | **Contract library** | SQLite persistence of analyzed contracts and their clauses |
 | **Semantic search** | TF-IDF cosine similarity search across every stored clause |
+| **Portfolio dashboard** | Library-wide analytics — risk distribution, most common clauses, KPIs |
+| **Learn section** | Interactive flip-card flashcards + articles on contract concepts |
 | **Export** | Download a full analysis as JSON or a printable HTML report |
+| **Security-hardened** | Escaped output (no XSS), parameterized SQL, validated uploads — see [SECURITY.md](SECURITY.md) |
 
 ## 📊 Model performance
 
@@ -68,8 +71,20 @@ Open http://localhost:8501 and upload
 pytest -q
 ```
 
-59 tests cover parsing, cleaning, clause classification, entity extraction,
-the risk engine, summarization, storage, search, and the end-to-end pipeline.
+73 tests cover parsing, cleaning, clause classification, entity extraction,
+the risk engine, summarization, storage, search, the end-to-end pipeline, and
+**security** (XSS/HTML-injection escaping, SQL-injection resistance, and file-upload validation).
+
+## 🛡️ Security
+
+The app is built defensively — see **[SECURITY.md](SECURITY.md)** for the full
+threat model and OWASP Web/LLM Top-10 mapping. Highlights:
+
+- **No XSS / HTML injection** — all document-derived text is HTML-escaped before render
+- **No SQL injection** — every query is parameterized
+- **Upload validation** — size, extension, and magic-byte checks before parsing
+- **No LLM attack surface** — classification is scikit-learn, not a prompt-driven model
+- **Local-only** — no outbound network calls at runtime; nothing leaves the machine
 
 ---
 

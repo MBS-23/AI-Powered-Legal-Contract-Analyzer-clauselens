@@ -1,12 +1,15 @@
 [theme]
-primaryColor = "#2c5282"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f4f7fb"
+base = "light"
+primaryColor = "#c9a227"          # gold accent
+backgroundColor = "#eef2f7"       # soft slate (not pure white)
+secondaryBackgroundColor = "#ffffff"
 textColor = "#1f2933"
 font = "sans serif"
 
 [server]
-maxUploadSize = 25
+maxUploadSize = 15                 # matches security.MAX_UPLOAD_BYTES
+enableXsrfProtection = true
+enableCORS = true
 
 [browser]
 gatherUsageStats = false

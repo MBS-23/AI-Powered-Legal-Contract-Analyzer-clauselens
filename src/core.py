@@ -28,6 +28,7 @@ from src.extraction.clause_extractor import extract_clauses, ClauseMatch
 from src.extraction.entity_extractor import extract_entities, ContractEntities
 from src.analysis.risk_engine import analyze_risk, RiskReport
 from src.analysis.summarizer import summarize_contract, summarize_text
+from src.security import clean_text_input
 
 
 @dataclass
@@ -111,6 +112,9 @@ def _parse_file(path: str | Path) -> tuple[str, dict]:
 def analyze_text(text: str, filename: str = "contract", meta: dict | None = None,
                  use_ml: bool = True) -> AnalysisResult:
     """Run the full analysis pipeline on already-extracted text."""
+    # Security boundary: normalize + bound untrusted document text (strips
+    # control chars, caps length) before any processing or storage.
+    text = clean_text_input(text)
     cleaned = normalize_whitespace(clean_text(strip_page_markers(text)))
 
     clauses = extract_clauses(cleaned, use_ml=use_ml)
