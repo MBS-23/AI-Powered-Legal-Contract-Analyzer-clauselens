@@ -297,6 +297,17 @@ textarea, [data-baseweb="input"] { background:var(--card) !important; border-col
 .stRadio label p, .stCheckbox label p, [data-baseweb="radio"] div, .stSlider label,
 [data-testid="stMarkdownContainer"] p { color:var(--ink); }
 [data-baseweb="popover"] li, [data-baseweb="menu"] li { color:var(--ink); }
+/* Native headings/captions follow the theme (config textColor is fixed-dark, so
+   without this they stay off-white and vanish on the light background). */
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5,
+[data-testid="stHeading"], [data-testid="stHeadingWithActionElements"] *,
+[data-testid="stMarkdownContainer"] h1, [data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3, [data-testid="stMarkdownContainer"] h4 { color:var(--ink) !important; }
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color:var(--muted) !important; }
+/* File-uploader browse button */
+[data-testid="stFileUploaderDropzone"] button {
+  background:var(--card2) !important; color:var(--ink) !important; border:1px solid var(--ring) !important; }
+[data-testid="stFileUploaderDropzone"] button:hover { border-color:var(--gold) !important; }
 
 /* ---- File uploader — premium drop zone ---- */
 [data-testid="stFileUploaderDropzone"] { background:linear-gradient(180deg,var(--card),var(--card2));
@@ -315,6 +326,15 @@ textarea, [data-baseweb="input"] { background:var(--card) !important; border-col
 [data-testid="stExpander"] { background:var(--card); border:1px solid var(--ring); border-radius:14px; }
 [data-testid="stExpander"] summary:hover { color:var(--gold2); }
 [data-testid="stDataFrame"] { border:1px solid var(--ring); border-radius:12px; }
+
+/* ---- Themed data tables (used instead of st.dataframe so they follow theme) ---- */
+.table-wrap { max-height:440px; overflow:auto; border:1px solid var(--ring); border-radius:13px; box-shadow:0 8px 22px var(--shadow); }
+table.lca-table { width:100%; border-collapse:collapse; font-size:.86rem; }
+table.lca-table th { background:var(--card2); color:var(--gold2); text-align:left; padding:.55rem .8rem;
+  border-bottom:1px solid var(--ring); font-weight:700; position:sticky; top:0; white-space:nowrap; }
+table.lca-table td { padding:.5rem .8rem; border-bottom:1px solid var(--line); color:var(--ink); vertical-align:top; }
+table.lca-table tr:last-child td { border-bottom:none; }
+table.lca-table tbody tr:hover td { background:var(--card2); }
 
 /* ---- Flashcards ---- */
 .flip-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); gap:1.1rem; }
@@ -365,6 +385,21 @@ def hero(eyebrow: str, title: str, subtitle: str, badges: list[tuple[str, str]] 
     st.markdown(
         f"<div class='hero'><div class='eyebrow'>{safe(eyebrow)}</div>"
         f"<h1>{safe(title)}</h1><div class='accent'></div><p>{safe(subtitle)}</p>{badge_html}</div>",
+        unsafe_allow_html=True)
+
+
+def render_table(df: pd.DataFrame, columns: list[str] | None = None) -> None:
+    """Render a DataFrame as a theme-aware HTML table (st.dataframe can't follow
+    our runtime light/dark theme). Values are escaped."""
+    cols = columns or list(df.columns)
+    head = "".join(f"<th>{safe(c.replace('_',' ').title())}</th>" for c in cols)
+    rows = []
+    for _, row in df.iterrows():
+        cells = "".join(f"<td>{safe(row[c])}</td>" for c in cols)
+        rows.append(f"<tr>{cells}</tr>")
+    st.markdown(
+        f"<div class='table-wrap'><table class='lca-table'><thead><tr>{head}</tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>",
         unsafe_allow_html=True)
 
 
@@ -542,8 +577,7 @@ def page_dashboard() -> None:
             st.plotly_chart(_theme_fig(fig, 330), use_container_width=True)
 
     st.markdown("### Recent contracts")
-    st.dataframe(df[["id", "filename", "upload_date", "num_clauses", "risk_level", "risk_score"]].head(8),
-                 use_container_width=True, hide_index=True)
+    render_table(df.head(8), ["id", "filename", "upload_date", "num_clauses", "risk_level", "risk_score"])
 
 
 # ---------------------------------------------------------------------------
@@ -691,8 +725,7 @@ def page_library() -> None:
         return
 
     df = pd.DataFrame(contracts)
-    st.dataframe(df[["id", "filename", "upload_date", "num_clauses", "risk_level", "risk_score"]],
-                 use_container_width=True, hide_index=True)
+    render_table(df, ["id", "filename", "upload_date", "num_clauses", "risk_level", "risk_score"])
 
     ids = [c["id"] for c in contracts]
     selected = st.selectbox("Open a contract", ids, format_func=lambda i: next(c["filename"] for c in contracts if c["id"] == i))
@@ -720,8 +753,10 @@ def page_library() -> None:
     st.markdown("**Clauses**")
     clause_df = pd.DataFrame(contract["clauses"])
     if not clause_df.empty:
-        st.dataframe(clause_df[["section_number", "heading", "clause_type", "confidence", "method"]],
-                     use_container_width=True, hide_index=True)
+        clause_df = clause_df.copy()
+        if "confidence" in clause_df:
+            clause_df["confidence"] = clause_df["confidence"].map(lambda x: f"{float(x):.0%}" if pd.notna(x) else "—")
+        render_table(clause_df, ["section_number", "heading", "clause_type", "confidence", "method"])
 
 
 # ---------------------------------------------------------------------------
@@ -813,7 +848,7 @@ def page_about() -> None:
         with st.expander("Accuracy by clause type"):
             pcf = pd.DataFrame(sorted(metrics["per_class_f1"].items(), key=lambda kv: kv[1], reverse=True),
                                columns=["Clause type", "Score"])
-            st.dataframe(pcf, use_container_width=True, hide_index=True)
+            render_table(pcf, ["Clause type", "Score"])
 
     st.markdown("#### The process")
     stages = [("file", "Read & organize", "PDF and Word documents are read and organized into clean, structured text."),
