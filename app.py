@@ -178,9 +178,14 @@ section[data-testid="stSidebar"] * { color:#dbe6f2; }
 .brand .name { font-family:'Playfair Display',serif; color:#fff; font-size:1.2rem; font-weight:800; line-height:1.05; }
 .brand .name small { display:block; color:var(--gold-2); font-size:.6rem; letter-spacing:2.5px; text-transform:uppercase; font-family:'Inter',sans-serif; font-weight:700; margin-top:3px; }
 section[data-testid="stSidebar"] hr { border-color:rgba(255,255,255,.12); margin:.7rem 0; }
-/* nav buttons */
-section[data-testid="stSidebar"] .stButton>button { justify-content:flex-start; text-align:left; border:none; background:transparent;
-  color:#cdd9e8; font-weight:600; border-left:3px solid transparent; border-radius:10px; padding:.55rem .8rem; box-shadow:none; }
+/* nav buttons — one aligned line each, left-aligned so icons form a column */
+section[data-testid="stSidebar"] .stButton>button { justify-content:flex-start !important; text-align:left !important;
+  border:none; background:transparent; color:#cdd9e8; font-weight:600; border-left:3px solid transparent; border-radius:10px;
+  padding:.55rem .95rem; box-shadow:none; white-space:nowrap; overflow:hidden; gap:.7rem !important; }
+section[data-testid="stSidebar"] .stButton>button > * { justify-content:flex-start !important; }
+section[data-testid="stSidebar"] .stButton>button p,
+section[data-testid="stSidebar"] .stButton>button div,
+section[data-testid="stSidebar"] .stButton>button span { white-space:nowrap; margin:0; text-align:left !important; }
 section[data-testid="stSidebar"] .stButton>button:hover { background:rgba(255,255,255,.08); transform:translateX(2px); color:#fff; border-color:transparent; }
 section[data-testid="stSidebar"] .stButton>button[kind="primary"] { background:rgba(201,162,39,.16); color:#fff; border-left-color:var(--gold); }
 .side-stat { display:flex; align-items:center; gap:.45rem; background:rgba(255,255,255,.06); border:1px solid rgba(201,162,39,.22);
@@ -445,7 +450,8 @@ def page_analyze(use_ml: bool) -> None:
     c1.metric("Format", result.meta.get("file_type", "—"))
     c2.metric("Sections", len(result.clauses))
     c3.metric("Clauses identified", len(result.detected_clauses))
-    c4.metric("Risk", f"{result.risk.level} · {result.risk.score}/100")
+    # Level as the value (short — never truncates); score in the label.
+    c4.metric(f"Risk · {result.risk.score}/100", result.risk.level)
 
     tabs = st.tabs(["Summary", "Risk", "Clauses", "Key Terms", "Full Text", "Export & Save"])
 
