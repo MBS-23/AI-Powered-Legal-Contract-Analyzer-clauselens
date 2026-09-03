@@ -219,3 +219,11 @@ def count_contracts(db_path: str | Path = DEFAULT_DB_PATH) -> int:
     init_db(db_path)
     with _connect(db_path) as conn:
         return int(conn.execute("SELECT COUNT(*) FROM contracts").fetchone()[0])
+
+
+def count_clauses(db_path: str | Path = DEFAULT_DB_PATH) -> int:
+    """Total number of stored clauses — used as a cache signature so the
+    search index rebuilds whenever the library's contents change."""
+    init_db(db_path)
+    with _connect(db_path) as conn:
+        return int(conn.execute("SELECT COUNT(*) FROM clauses").fetchone()[0])

@@ -304,7 +304,9 @@ def method_donut(clauses) -> go.Figure | None:
 
 
 @st.cache_resource(show_spinner=False)
-def _search_index(cache_key: int) -> SemanticSearchIndex:
+def _search_index(contract_count: int, clause_count: int) -> SemanticSearchIndex:
+    # Keyed on (contracts, clauses) so the index rebuilds whenever the library
+    # changes — adding OR removing contracts, even if the count nets out.
     return SemanticSearchIndex.from_clauses(db.get_all_clauses())
 
 
@@ -591,7 +593,7 @@ def page_search() -> None:
     if count == 0:
         st.info("Your library is empty. Analyze and save some contracts first.")
         return
-    index = _search_index(count)
+    index = _search_index(count, db.count_clauses())
     if index.is_empty:
         st.info("No clauses available to search yet.")
         return

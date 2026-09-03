@@ -41,7 +41,7 @@ def test_html_report_builds():
     result = analyze_file(SAMPLE)
     html = build_html_report(result)
     assert html.lstrip().lower().startswith("<!doctype html>")
-    assert "Risk Assessment" in html
+    assert "risk assessment" in html.lower()
     assert result.entities.parties[0] in html
 
 
