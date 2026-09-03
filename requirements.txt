@@ -1,0 +1,24 @@
+# ---------------------------------------------------------------------------
+# Runtime dependencies for the Streamlit app (what Streamlit Cloud installs).
+# Training-only extras live in requirements-train.txt.
+# ---------------------------------------------------------------------------
+
+# Core app
+streamlit>=1.38
+pandas>=2.2
+plotly>=5.24
+
+# Document parsing
+pdfplumber>=0.11
+python-docx>=1.1
+docx2txt>=0.8
+
+# ML clause classifier. scikit-learn is pinned so the committed model artifact
+# (models/clause_classifier.joblib) unpickles reliably on the deploy target.
+scikit-learn==1.9.0
+numpy>=2.0
+scipy>=1.13
+joblib>=1.4
+
+# Tests
+pytest>=8.3

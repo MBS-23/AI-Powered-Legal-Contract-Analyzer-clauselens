@@ -1,0 +1,14 @@
+# Extra dependencies needed ONLY to (re)build the dataset and train the model.
+# The deployed app does not need these.
+#
+#   pip install -r requirements.txt -r requirements-train.txt
+#   python training/prepare_cuad_dataset.py
+#   python training/train_classifier.py
+
+-r requirements.txt
+
+# HuggingFace datasets is optional; the prep script downloads CUAD directly
+# from the Atticus Project GitHub release and only needs the stdlib + pandas.
+# Listed here for convenience if you prefer the datasets loader.
+datasets>=3.0
+huggingface_hub>=0.24
