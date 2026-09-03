@@ -11,11 +11,11 @@ from __future__ import annotations
 import html
 from datetime import datetime
 
-NAVY = "#0f2a4a"
-NAVY_2 = "#1c4a7e"
-GOLD = "#c9a227"
-_SEVERITY_COLORS = {"high": "#c0392b", "medium": "#d68910", "low": "#7d8a99"}
-_LEVEL_COLORS = {"High": "#c0392b", "Medium": "#d68910", "Low": "#1e8449"}
+NAVY = "#0B1F35"
+NAVY_2 = "#185A63"      # teal (brand secondary)
+GOLD = "#C79A3C"        # slightly deeper gold for readable text on white
+_SEVERITY_COLORS = {"high": "#C0564F", "medium": "#B9812E", "low": "#7d8a99"}
+_LEVEL_COLORS = {"High": "#C0564F", "Medium": "#B9812E", "Low": "#2E8B62"}
 
 # Inline brand emblem (matches the app sidebar logo).
 _LOGO = """

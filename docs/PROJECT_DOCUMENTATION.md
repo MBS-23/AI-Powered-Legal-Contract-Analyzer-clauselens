@@ -114,7 +114,7 @@ This is the most important decision in the project.
   - **Size & deployability:** the entire model artifact is a few MB and loads instantly. A transformer stack (PyTorch + `transformers` + model weights) is hundreds of MB to gigabytes — too heavy for a free Streamlit deployment and slow to cold-start.
   - **Speed:** TF-IDF + Logistic Regression classifies a whole contract in milliseconds on CPU. No GPU required.
   - **Explainability & determinism:** linear models are transparent and give the same answer every time.
-  - **It's good enough — measurably.** On the CUAD test set it reaches **76.0% accuracy** and **0.66 macro-F1** across 41 classes, versus a **16.2%** majority/keyword baseline — roughly a **4.7×** lift. That accuracy is more than enough for a first-pass triage tool.
+  - **It's good enough — measurably.** On the CUAD test set it reaches **77.1% accuracy** and **0.70 macro-F1** across 41 classes, versus a **16.2%** majority/keyword baseline — roughly a **4.8×** lift. That accuracy is more than enough for a first-pass triage tool. (Pushing past ~85% would require a transformer such as Legal-BERT, at ~100× the size and cost and with new failure modes — a trade rejected for a private, free, CPU-only deployment.)
   - **The trade-off we accepted:** a transformer would likely score higher on subtle clauses, at 100× the size and cost. For a deployable, private, CPU-only tool, that trade is not worth it. This is documented honestly rather than hidden.
 - **Model selection:** we compared candidates during training and **Logistic Regression** was selected on validation macro-F1 (over e.g. linear SVM / naive Bayes variants). A **confidence threshold (0.15)** suppresses low-confidence guesses, and a **15-type keyword baseline** acts as a transparent fallback when the model is off or unavailable.
 
@@ -160,13 +160,14 @@ Not using an LLM at analysis time is a **feature**, not a limitation. It makes C
 ## 7. The machine-learning model in depth
 
 - **Task:** multi-class classification of a clause's text into one of 41 CUAD categories.
-- **Features:** TF-IDF vectors over word/character n-grams of the clause text.
-- **Model:** Logistic Regression, selected over alternatives on validation macro-F1.
+- **Features:** a union of **word (1–2 gram) and character (3–5 gram) TF-IDF** vectors — char n-grams add robustness to legal morphology, hyphenation and minor OCR noise, and measurably lift balanced accuracy.
+- **Model:** Logistic Regression (class-balanced), selected over a calibrated Linear SVC on validation macro-F1.
 - **Data:** CUAD — 10,901 training clauses, 1,368 test clauses.
 - **Results (held-out test set):**
-  - Accuracy **75.95%**
-  - Macro-F1 **0.661**, Weighted-F1 **0.755**
-  - Baseline (majority/keyword) accuracy **16.15%** → **~4.7× improvement**
+  - Accuracy **77.1%**
+  - Macro-F1 **0.704**, Weighted-F1 **0.755**
+  - Baseline (majority/keyword) accuracy **16.2%** → **~4.8× improvement**
+  - Ceiling note: a transformer (Legal-BERT) could push accuracy higher, but at a size/cost/latency that breaks the free, private, CPU-only deployment — so it was deliberately not used.
 - **Confidence threshold (0.15):** below this, the model abstains rather than guess, and the clause is shown as "unclassified" — better to say "not sure" than to be confidently wrong.
 - **Keyword fallback (15 types):** a transparent baseline used when the model is disabled or unavailable, so the app always works.
 - **Deployment:** the trained model is committed as `models/clause_classifier.joblib` and `scikit-learn` is pinned (`==1.9.0`) so the artifact unpickles reliably on the deploy target.
@@ -215,7 +216,7 @@ Run them with `pytest tests/ -q`.
 
 ## 11. Results & performance
 
-- **Clause classifier:** 76.0% accuracy / 0.66 macro-F1 across 41 types (vs 16.2% baseline).
+- **Clause classifier:** 77.1% accuracy / 0.70 macro-F1 across 41 types (vs 16.2% baseline).
 - **Speed:** a full contract — parse, classify, extract, score, summarize — completes in seconds on CPU, with no network calls.
 - **Footprint:** a few-MB model and a lean dependency set that installs and cold-starts quickly on free hosting.
 - **Verified end to end** on real contracts (e.g. a multi-page agreement: 33 sections, 28 clauses identified, risk scored).
@@ -228,7 +229,7 @@ Run them with `pytest tests/ -q`.
 |---|---|
 | CUAD's official HuggingFace loader is broken | Load the dataset directly from the Atticus GitHub `data.zip` in the offline training script. |
 | Legal text is dense and irregularly formatted | Heading-based segmentation + robust text cleaning + a confidence threshold so weak guesses abstain. |
-| Keeping a transformer's accuracy without its weight | Tuned TF-IDF + Logistic Regression to a strong 76% and accepted the honest trade-off for a deployable, private, CPU-only tool. |
+| Keeping a transformer's accuracy without its weight | Tuned word+char TF-IDF + Logistic Regression to 77% and accepted the honest trade-off for a deployable, private, CPU-only tool. |
 | Rendering untrusted contract text safely | Central escaping (`src/security.py`) applied everywhere the UI emits HTML. |
 | Model must unpickle on the deploy target | Pin `scikit-learn==1.9.0` and commit the artifact. |
 | Search results going stale after edits | Cache the search index on `(contracts, clauses)` so it rebuilds on any library change. |
@@ -289,6 +290,40 @@ legal-contract-analyzer/
 - Playbook comparison (benchmark a contract against a company's standard positions).
 - Clause redlining suggestions.
 - Optional, privacy-preserving LLM layer for negotiation drafting (kept out of the analysis path).
+
+---
+
+## 17. State management, caching & performance
+
+- **Session state:** the current analysis and its signature (`analysis`, `analysis_sig`, `saved_id`) live in `st.session_state`; the active page lives in `st.session_state.nav`. Re-analysis only runs when the upload signature changes, so navigating between tabs never re-processes the document.
+- **Dashboard freshness:** all dashboard and sidebar figures are read **live** from SQLite on every rerun (`db.list_contracts`, `db.count_contracts`, `db.get_all_clauses`) — there are no hardcoded or cached dashboard numbers, so counts, charts, and the library always reflect the true state after a save or delete.
+- **Search index caching:** the TF-IDF search index is cached with `@st.cache_resource` keyed on `(contract_count, clause_count)`, so it rebuilds automatically whenever the library changes — but not on every rerun.
+- **Model loading:** the `joblib` model is loaded once and reused; classification is milliseconds on CPU.
+- **No wasteful reruns:** actions that change data (`save`, `delete`) call `st.rerun()` once; there are no rerun loops.
+
+## 18. Interview explanations
+
+**A. 30-second version**
+> ClauseLens is an AI-assisted legal contract analyzer. You upload a PDF or Word contract and it identifies the clauses, extracts the key terms, scores the risk out of 100, and writes a plain-English summary — turning hours of manual review into a minutes-long first pass. I built it in Python with scikit-learn and Streamlit, and I deliberately used a lightweight, explainable ML model instead of a large language model so it's private, instant, and deployable for free.
+
+**B. 2-minute version**
+> Contract review is slow and error-prone — reviewers wade through boilerplate to find the few clauses that carry risk. ClauseLens automates that first pass. It parses the document, splits it into sections, and a machine-learning model I trained on the CUAD dataset labels each section as one of 41 clause types at about 77% accuracy. Rule-based extractors pull out parties, dates, money, and governing law, and a rule-based engine scores risk from risky clauses present, protective clauses missing, and red-flag language — every finding citing its evidence. It then writes a fact-based summary and makes every clause searchable. The key engineering decision was to avoid an LLM: classical TF-IDF + Logistic Regression is a few MB, runs on CPU in milliseconds, is fully explainable, and can't hallucinate a clause — exactly what a legal tool needs. It's covered by 73 tests and hardened against the OWASP Web and LLM Top 10.
+
+**C. 5-minute technical version**
+> Walk through the layered architecture (document → preprocessing → extraction → analysis → presentation/storage/search, orchestrated by `core.py`). Explain the model: word+char TF-IDF features feeding a class-balanced Logistic Regression, selected over a calibrated Linear SVC on validation macro-F1, trained on 10,901 CUAD clauses and reaching 77.1% accuracy / 0.70 macro-F1 versus a 16.2% baseline, with a 0.15 confidence threshold and a keyword fallback. Cover the deliberate absence of an LLM and why (privacy, determinism, no hallucination, cost, no prompt-injection surface). Cover the rule-based entity and risk layers and why rules beat models for regular, auditable outputs. Cover the deployment story (committed model, pinned scikit-learn, Streamlit Cloud) and the security controls. Close with honest limitations (imbalanced classes, no OCR, single-tenant) and the roadmap.
+
+## 19. Interview questions & answers
+
+- **Why Streamlit, not React/FastAPI?** For a single-flow data tool, Streamlit turns Python into an interactive app with no separate front-end, API, or build pipeline, and deploys free. React/FastAPI would be the right call for a multi-tenant production SaaS — that's on the roadmap, not needed for this scope.
+- **Why not use an LLM?** Privacy (no data leaves the process), determinism, no hallucinated clauses, no prompt-injection surface, instant CPU inference, and zero per-call cost. For legal review, explainability and traceability matter more than a few points of accuracy.
+- **Why classical ML / how does clause classification work?** Clause text → word (1–2) + char (3–5) TF-IDF vectors → class-balanced Logistic Regression over 41 CUAD classes, with a confidence threshold so weak predictions abstain.
+- **How is risk calculated?** A transparent rule-based engine: risky clauses present + protective clauses missing + red-flag phrases → a 0–100 score with evidence-cited findings. It's decision-support, not a legal judgement.
+- **How are PDFs processed?** `pdfplumber` for PDF text, `python-docx` for DOCX; scanned image-only PDFs are detected and flagged (no OCR step).
+- **How does the dashboard stay in sync?** Every figure is read live from SQLite each rerun; nothing is hardcoded. Save/delete trigger a single rerun.
+- **What happens when the model is wrong?** The confidence threshold suppresses weak guesses (shown as "unclassified"), the keyword baseline backs it up, and the UI + disclaimer make clear it's decision-support requiring human review.
+- **What are the limitations?** ~77% accuracy on imbalanced 41-class data; ambiguous/unusual contracts; no OCR; single shared library without auth; rule-based risk is heuristic.
+- **How would you scale it / reach higher accuracy?** Add authentication and per-user isolation, move storage to Postgres, split into an API + React front-end, and — for accuracy — fine-tune Legal-BERT with a GPU-backed inference service (accepting the cost/privacy trade-offs).
+- **How do you secure legal documents?** Output escaping (no XSS), parameterized SQL, magic-byte upload validation, input hardening, no third-party calls; mapped to OWASP Web/LLM Top 10 and tested.
 
 ---
 

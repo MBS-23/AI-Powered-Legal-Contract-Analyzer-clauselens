@@ -12,3 +12,6 @@
 # Listed here for convenience if you prefer the datasets loader.
 datasets>=3.0
 huggingface_hub>=0.24
+
+# Generate the branded case-study PDF (scripts/md_to_pdf.py).
+reportlab>=4.0

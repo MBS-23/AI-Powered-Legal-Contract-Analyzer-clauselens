@@ -16,7 +16,7 @@ GPU, no paid API, no data leaves the machine. Designed to deploy to
 ## 📚 Documentation
 
 - **[Full project documentation](docs/PROJECT_DOCUMENTATION.md)** — the complete from-scratch explanation: problem, architecture, every tech-stack decision and *why*, the ML model in depth, design, security, and results.
-- **[Case study & LinkedIn post](docs/CASE_STUDY.md)** — a shareable writeup and a ready-to-post version.
+- **[Public case study](docs/CASE_STUDY.md)** — portfolio/GitHub showcase with LinkedIn copy and GitHub topics ([PDF version](docs/ClauseLens_Case_Study.pdf)).
 - **[Security posture](SECURITY.md)** — threat model and OWASP Web/LLM Top-10 mapping.
 
 ## ✨ Features

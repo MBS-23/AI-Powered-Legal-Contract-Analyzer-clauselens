@@ -1,89 +1,286 @@
-# ClauseLens — Case Study & LinkedIn Post
+# ClauseLens
 
-This document is both a portfolio case study and a ready-to-share writeup. The first section is a **copy-paste-ready LinkedIn post**; the rest is a fuller case study you can keep with the project.
+## AI-Powered Legal Contract Intelligence
 
----
+**ClauseLens** is an AI-assisted contract-analysis platform that supports the first-pass review of legal agreements. Upload a PDF or Word contract and ClauseLens identifies its clauses, extracts the key terms (parties, dates, financial figures, governing law), evaluates potential risk, and presents the findings through a clean, interactive interface — turning hours of manual reading into a structured review that takes minutes.
 
-## 📋 Ready-to-post LinkedIn version
-
-> Copy everything in this block, add 1–2 screenshots (the dashboard and a report), and post.
+It is built to be **private, explainable, and deployable**: the analysis runs on a lightweight, CPU-only machine-learning pipeline with no third-party AI calls, so contract text never leaves the application at analysis time.
 
 ---
 
-⚖️ I built **ClauseLens** — an AI-assisted legal contract analyzer that turns hours of contract review into a structured, minutes-long first pass.
+## 1. Key features
 
-Reviewing a contract is slow and repetitive: you read pages of boilerplate to find the few clauses that actually carry risk, pull out the who / when / how-much, and try to notice not just the risky terms that *are* there, but the protections that are *missing*. ClauseLens does that first pass for you.
-
-**What it does 👇**
-📄 Reads PDF & Word contracts and extracts clean text
-🏷️ Identifies **41 clause types** with a trained ML model (76% accuracy vs a 16% baseline — a 4.7× lift)
-🔍 Extracts parties, dates, money & governing law
-⚠️ Scores legal risk 0–100 — flagging risky clauses *and* missing protections, each finding citing its evidence
-📝 Writes a plain-English summary and a shareable, branded report
-🔎 Makes every clause semantically searchable
-
-**The interesting engineering decision:** I deliberately used **classical ML (TF-IDF + Logistic Regression on the CUAD dataset)** instead of a large language model. Why?
-✅ Runs on CPU in milliseconds, deploys free, cold-starts instantly
-✅ 100% private — no contract text ever leaves the process
-✅ Deterministic & explainable — no hallucinated clauses, which is non-negotiable for a legal tool
-✅ Immune to prompt-injection because there's no prompt in the loop
-
-Sometimes the right answer isn't the biggest model — it's the one you can measure, trust, deploy, and defend. A transformer might score a few points higher at 100× the size and cost; for a private, deployable review tool, that trade wasn't worth it.
-
-Built end-to-end with **Python, scikit-learn, Streamlit, and SQLite**, hardened against the OWASP Web & LLM Top 10, and covered by 73 automated tests.
-
-⚠️ It's a decision-support tool, not a replacement for a qualified attorney.
-
-Would you trust a classical ML model over an LLM for a task like this? Curious what others think. 👇
-
-#MachineLearning #LegalTech #Python #DataScience #NLP #AI #scikitlearn #Streamlit #SoftwareEngineering #ContractManagement
+- **AI-assisted clause identification** — classifies each contract section into one of 41 clause types.
+- **Legal document processing** — reads both PDF and Word (DOCX) contracts.
+- **Key term extraction** — parties, effective date, term, governing law, monetary amounts, notice periods.
+- **Contract risk assessment** — a transparent 0–100 risk score with ranked, evidence-cited findings.
+- **Structured analysis reports** — a branded, exportable HTML report plus JSON data.
+- **Contract library** — save analyses and browse portfolio-level analytics.
+- **Clause search** — find similar clauses across the whole library.
+- **Contract knowledge center** — flashcards and articles that teach the underlying concepts.
+- **Interactive dashboard** — live metrics and visualizations of your reviewed contracts.
 
 ---
+
+## 2. System workflow
+
+```
+Contract Upload
+      ↓
+Document Processing (PDF / DOCX)
+      ↓
+Text Extraction & Cleaning
+      ↓
+NLP / AI Analysis
+      ↓
+Clause Identification (41 types)
+      ↓
+Key Term Extraction
+      ↓
+Risk Assessment (0–100)
+      ↓
+Report Generation
+      ↓
+Dashboard / Library / Search
+```
+
 ---
 
-## 📖 Full case study
+## 3. Technology stack
 
-### The problem
-Contract review is a bottleneck in sales, procurement, and due diligence. It's slow, repetitive, and fatigue-prone — and the mistakes happen exactly where attention runs out, deep in the boilerplate. I wanted to remove the mechanical first pass so a human can spend their time on judgement.
-
-### The solution
-**ClauseLens** is an AI-assisted contract analyzer. Upload a PDF or Word contract and it:
-- reads and cleans the document,
-- classifies each section into one of 41 clause types,
-- extracts the commercial facts (parties, dates, money, governing law, term, notice),
-- scores risk 0–100 from risky clauses present, protective clauses missing, and red-flag language,
-- writes a plain-English summary,
-- and makes every clause searchable across a saved library.
-
-It ships with a portfolio dashboard, a branded exportable report, and a "Learn" section of flashcards and articles on contract concepts.
-
-### Key results
-| Metric | Result |
+| Technology | Purpose |
 |---|---|
-| Clause-classification accuracy | **76.0%** (macro-F1 0.66) across 41 types |
-| Baseline (majority/keyword) | 16.2% → **~4.7× improvement** |
-| Training / test data | 10,901 / 1,368 CUAD clauses |
-| Speed | Full contract analyzed in **seconds on CPU**, no network calls |
-| Tests | **73 automated tests**, incl. a security suite |
+| **Python 3.13** | Core language for the pipeline and app |
+| **Streamlit** | Interactive web UI and deployment |
+| **scikit-learn** | Clause classifier (TF-IDF + Logistic Regression) |
+| **CUAD dataset** | Expert-labelled training data (41 clause types) |
+| **pdfplumber** | PDF text extraction |
+| **python-docx / docx2txt** | DOCX text extraction |
+| **pandas / NumPy / SciPy** | Data handling and numerics |
+| **Plotly** | Interactive charts (risk gauge, distributions) |
+| **SQLite** | Contract library storage |
+| **pytest** | Automated testing (73 tests) |
 
-### The engineering story: classical ML over an LLM
-The defining decision was to **not** use a large language model at analysis time. Classical ML (TF-IDF + Logistic Regression) gave me a model that is a few MB, runs on CPU in milliseconds, deploys free, is fully explainable, and — critically for a legal tool — can never hallucinate a clause. It reaches 76% accuracy, more than enough for first-pass triage. A transformer would likely edge that higher, but at 100× the footprint and cost and with new failure modes (hallucination, prompt-injection, latency, price). For a private, deployable tool, the classical approach was the *engineering* win, not a compromise.
-
-### Built with
-`Python` · `scikit-learn` (TF-IDF + Logistic Regression) · `CUAD` dataset · `pdfplumber` / `python-docx` · rule-based entity extraction & risk scoring · `SQLite` · `Streamlit` · `Plotly`.
-
-### Security
-Engineered defensively from the start: output escaping (no XSS), parameterized SQL, magic-byte upload validation, input hardening — mapped to the OWASP Web & LLM Top 10 and covered by tests. With no LLM in the loop, there is no prompt-injection surface at all.
-
-### What I learned
-- Match the model to the constraints — deployability, privacy, explainability and cost are real requirements, not afterthoughts.
-- In regulated domains, **determinism and traceability** can matter more than a few points of accuracy.
-- A clean, layered architecture makes an "AI project" testable, honest, and shippable.
-
-### Try it / see the code
-🔗 GitHub: *[add your repository link]*
-🔗 Live demo: *[add your Streamlit Cloud link]*
+*(No large language model or transformer is used — see §4.)*
 
 ---
 
-*ClauseLens provides automated analysis to accelerate review. It is a decision-support tool and does not replace advice from a qualified attorney.*
+## 4. AI / ML approach
+
+- **Model:** a scikit-learn pipeline — a union of **word (1–2 gram) and character (3–5 gram) TF-IDF** features feeding a class-balanced **Logistic Regression**, selected over a calibrated Linear SVC on validation macro-F1.
+- **Dataset:** the **Contract Understanding Atticus Dataset (CUAD)** — 41 expert-annotated clause categories; trained on 10,901 clauses, evaluated on 1,368.
+- **Clause recognition:** each section is classified with a confidence threshold, so low-confidence predictions abstain rather than mislabel; a keyword baseline provides a transparent fallback.
+- **Information extraction:** rule-based (regex/heuristics) for parties, dates, money, governing law, term, and notice periods — precise and fully explainable.
+- **Risk analysis:** a rule-based engine combining risky clauses present, protective clauses missing, and red-flag language into a 0–100 score with evidence.
+
+**Why classical ML instead of an LLM?** A few-MB, CPU-only model is private, instant, explainable, deterministic, free to run, and cannot hallucinate a clause — the properties a legal tool needs. A transformer could edge accuracy higher, at ~100× the size and cost; that trade was deliberately not taken for a deployable, private tool.
+
+---
+
+## 5. User experience
+
+**Pages:** Dashboard · Analyze Contract · Contract Library · Find Clauses · Learn · About.
+
+**Design philosophy:**
+- A professional legal-tech interface with a deep-navy / teal / gold palette.
+- Clear information hierarchy and risk-focused visualization (green = low, gold/amber = medium, red = high).
+- Serif display typography (Playfair Display) for headings; a modern sans-serif (Manrope) for body.
+- Subtle, purposeful animations (fade-in, hover elevation, staged processing, flip flashcards).
+- Responsive layout and reduced-motion support.
+
+---
+
+## 6. Results
+
+For a given contract, ClauseLens produces:
+
+- an **overall risk score** (0–100) and level (Low / Medium / High);
+- **clause categories** with confidence;
+- **extracted key terms** (parties, dates, money, governing law, notice);
+- ranked **risk findings** with evidence and recommendations;
+- a plain-English **executive summary**; and
+- a **downloadable report** (HTML) and data export (JSON).
+
+**Model evaluation (held-out CUAD test set):**
+
+| Metric | Value |
+|---|---|
+| Accuracy | **77.1%** |
+| Macro-F1 | **0.70** |
+| Weighted-F1 | **0.75** |
+| Baseline (majority/keyword) accuracy | 16.2% |
+| Improvement over baseline | **~4.8×** |
+| Clause types | 41 |
+| Training / test clauses | 10,901 / 1,368 |
+
+*Accuracy reflects a lightweight, deployable model; it is a first-pass triage aid, not a substitute for legal judgement.*
+
+---
+
+## 7. Project architecture
+
+```
+User
+ │
+ ▼
+Streamlit UI (app.py)
+ │
+ ▼
+Document layer  ──►  Preprocessing  ──►  Extraction  ──►  Analysis  ──►  core.py
+(pdf/docx)          (clean text)      (clauses+ML,      (risk engine,   (AnalysisResult)
+                                       entities)         summarizer)        │
+                                                                            ▼
+                                             ┌──────────────┬───────────────┐
+                                             ▼              ▼               ▼
+                                        Report (HTML)   SQLite library   TF-IDF search
+```
+
+Each layer is a small, independently tested Python package under `src/`, orchestrated by `core.py`.
+
+---
+
+## 8. Why this project?
+
+Legal contracts hold critical information that is time-consuming and error-prone to review by hand. ClauseLens explores how NLP and classical machine learning can structure that first-pass review — identifying clauses, surfacing risk, and making contracts searchable — while remaining private, explainable, and cheap enough to deploy for free.
+
+---
+
+## 9. Limitations
+
+ClauseLens is a **decision-support tool and does not replace qualified legal advice.**
+
+- Model accuracy is ~77% on an imbalanced 41-class task; unusual or ambiguous contracts may classify poorly.
+- There is no OCR, so scanned image-only PDFs are flagged rather than processed.
+- The risk score is a transparent heuristic, not a legal judgement.
+- The library is single-tenant (no authentication yet).
+
+All results should be reviewed by a qualified professional.
+
+---
+
+## 10. Future roadmap
+
+- **Phase 1 (current):** contract analysis — clauses, terms, risk, reports.
+- **Phase 2:** semantic clause search across the library. *(implemented)*
+- **Phase 3:** playbook / contract comparison.
+- **Phase 4:** version comparison and redlining.
+- **Phase 5:** OCR for scanned documents.
+- **Phase 6:** authentication and organization/workspace support.
+- **Phase 7:** API architecture and scalable, multi-tenant deployment.
+
+---
+
+## 11. Project structure
+
+```
+legal-contract-analyzer/
+├── app.py                     # Streamlit UI
+├── src/
+│   ├── core.py                # pipeline orchestrator
+│   ├── report.py              # branded HTML/JSON report
+│   ├── security.py            # escaping, upload validation
+│   ├── document/              # pdf_parser, docx_parser
+│   ├── preprocessing/         # text_cleaner
+│   ├── extraction/            # clause_extractor, entity_extractor, ml_classifier
+│   ├── analysis/              # risk_engine, summarizer
+│   ├── search/                # semantic_search (TF-IDF)
+│   ├── storage/               # db (SQLite)
+│   └── content/               # education (flashcards + articles)
+├── training/                  # CUAD prep + classifier training
+├── models/                    # committed clause_classifier.joblib
+├── tests/                     # 73 tests
+├── sample_contracts/          # demo contract
+├── docs/                      # documentation + this case study
+└── requirements.txt
+```
+
+---
+
+## 12. Local setup
+
+```bash
+git clone <repository-url>
+cd legal-contract-analyzer
+python -m venv venv
+venv\Scripts\activate            # Windows  (source venv/bin/activate on macOS/Linux)
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Open <http://localhost:8501> and upload a contract (a sample is in `sample_contracts/`).
+
+---
+
+## 13. Screenshots
+
+*(Add images when publishing.)*
+
+- Dashboard — `docs/screenshots/dashboard.png`
+- Analyze Contract — `docs/screenshots/analyze.png`
+- Analysis results & risk — `docs/screenshots/results.png`
+- Contract Library — `docs/screenshots/library.png`
+- Find Clauses — `docs/screenshots/search.png`
+- Learn — `docs/screenshots/learn.png`
+
+---
+
+## 14. Demo
+
+Upload a contract → watch the staged analysis → review the extracted clauses and key terms → inspect the 0–100 risk score and findings → save it to your library → search for a clause → download the report.
+
+---
+
+## 15. Disclaimer
+
+ClauseLens is an AI-assisted decision-support tool for contract review. It does not constitute legal advice and does not replace a qualified attorney. All outputs should be verified by a legal professional.
+
+---
+
+## 16. Author
+
+**Podugu Bala Veera Venkata Sunil**
+
+- GitHub: *(add your profile URL)*
+- LinkedIn: *(add your profile URL)*
+- Project: *(add your repository / live demo URL)*
+
+---
+
+## 17. LinkedIn & GitHub copy
+
+### LinkedIn headline
+
+> Built ClauseLens — an AI-powered legal contract analyzer (Python · scikit-learn · Streamlit) that turns hours of contract review into a minutes-long, structured first pass.
+
+### LinkedIn short version (~600 characters)
+
+> I built **ClauseLens**, an AI-powered legal contract analyzer. Upload a PDF or Word contract and it identifies clauses (41 types), extracts key terms, scores risk 0–100, and generates a structured report — turning hours of review into minutes. I used classical ML (TF-IDF + Logistic Regression on the CUAD dataset, ~77% accuracy) rather than an LLM, so it's private, explainable, and deploys for free. Built with Python, scikit-learn and Streamlit. It's a decision-support tool, not a replacement for a lawyer. #MachineLearning #LegalTech #Python #NLP
+
+### LinkedIn detailed version (~1,300 characters)
+
+> **ClauseLens — an AI-powered legal contract analyzer**
+>
+> Reviewing contracts is slow and repetitive: you read pages of boilerplate to find the few clauses that carry risk. I built ClauseLens to automate that first pass.
+>
+> Upload a PDF or Word contract and it:
+> • identifies each clause (41 types) with a model trained on the CUAD dataset
+> • extracts parties, dates, financial terms and governing law
+> • scores risk 0–100 — flagging risky clauses AND missing protections, each finding citing its evidence
+> • writes a plain-English summary and a shareable report
+> • makes every clause semantically searchable
+>
+> The key engineering decision was to use **classical ML (TF-IDF + Logistic Regression), not an LLM**. The result reaches ~77% accuracy on 41 classes, runs on CPU in milliseconds, keeps documents private, is fully explainable, and deploys for free — properties that matter more than a few points of accuracy for a legal tool.
+>
+> Built with Python, scikit-learn, and Streamlit; hardened against the OWASP Web & LLM Top 10 and covered by 73 automated tests.
+>
+> ⚠️ It's a decision-support tool, not a replacement for a qualified attorney.
+>
+> #MachineLearning #LegalTech #Python #DataScience #NLP #scikitlearn #Streamlit #AI
+
+### GitHub repository tagline
+
+> AI-powered legal contract analyzer — clause classification, key-term extraction, risk scoring, and search. Python · scikit-learn · Streamlit.
+
+### GitHub topics
+
+`legal-tech` · `nlp` · `machine-learning` · `contract-analysis` · `scikit-learn` · `streamlit` · `python` · `text-classification` · `document-intelligence` · `cuad` · `tfidf` · `data-science`
