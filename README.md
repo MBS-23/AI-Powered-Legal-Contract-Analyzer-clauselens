@@ -1,12 +1,17 @@
 # ⚖️ ClauseLens — Legal Contract Analyzer
 
-AI-assisted contract review — upload a PDF or DOCX and get clause
-classification, key-entity extraction, a prioritized risk report, plain-English
-summaries, a searchable contract library, and downloadable JSON/HTML reports.
+![License: MIT](https://img.shields.io/badge/License-MIT-D6B35A.svg)
+![Python](https://img.shields.io/badge/Python-3.13-0B1F35.svg)
+![Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-185A63.svg)
+![Tests](https://img.shields.io/badge/tests-73%20passing-27845A.svg)
 
-Built on an **open-source, fully-local stack** (scikit-learn + Streamlit) — no
-GPU, no paid API, no data leaves the machine. Designed to deploy to
-**Streamlit Community Cloud** in a few clicks.
+**AI-assisted legal contract analysis.** Upload a PDF or Word contract and
+ClauseLens identifies its clauses, extracts the key terms, scores the risk, and
+presents the findings through a polished, interactive dashboard — with a
+searchable contract library, a light/dark theme, and downloadable reports.
+
+Built on a lean, explainable stack (**scikit-learn + Streamlit**) — no GPU and
+no paid API, so it deploys to **Streamlit Community Cloud** in a few clicks.
 
 > ⚠️ This tool provides automated, informational analysis only. It is **not
 > legal advice** and does not replace review by a qualified attorney.
@@ -43,14 +48,16 @@ The clause classifier is trained on 10,901 CUAD clause spans and evaluated on
 
 | Metric | Value |
 |---|---|
-| Test accuracy | **76.0%** |
-| Macro-F1 | **0.66** |
-| Weighted-F1 | **0.76** |
+| Test accuracy | **77.1%** |
+| Macro-F1 | **0.70** |
+| Weighted-F1 | **0.75** |
 | Most-frequent baseline accuracy | 16.2% |
 | Clause types | 41 |
 
-Live metrics are shown in the app's **Model & About** page and stored in
-`models/metrics.json`.
+Features are a union of word and character TF-IDF n-grams. Live metrics are
+shown in the app's **About** page and stored in `models/metrics.json`.
+Reaching ~85%+ would require a transformer (e.g. Legal-BERT), which was
+deliberately avoided to keep the app private, free, and CPU-only.
 
 ---
 
@@ -169,7 +176,13 @@ legal-contract-analyzer/
 - **Storage/search:** SQLite (stdlib), TF-IDF cosine similarity
 - **Data:** [CUAD](https://www.atticusprojectai.org/cuad) (Contract Understanding Atticus Dataset)
 
+## 👤 Author
+
+**Podugu Bala Veera Venkata Sunil** — [github.com/MBS-23](https://github.com/MBS-23)
+
 ## 📄 License & data
 
-CUAD is released by The Atticus Project under CC BY 4.0. This project is for
-educational and demonstration purposes.
+This project is released under the **[MIT License](LICENSE)**.
+
+The **CUAD** dataset used to train the clause classifier is released by
+The Atticus Project under CC BY 4.0.
