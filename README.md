@@ -1,4 +1,4 @@
-# ⚖️ Legal Contract Analyzer
+# ⚖️ Lexalytics — Legal Contract Analyzer
 
 AI-assisted contract review — upload a PDF or DOCX and get clause
 classification, key-entity extraction, a prioritized risk report, plain-English

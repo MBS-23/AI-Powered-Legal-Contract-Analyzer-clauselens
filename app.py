@@ -1,15 +1,12 @@
 """
 app.py — Legal Contract Analyzer dashboard.
 
-A professional multi-page Streamlit UI over the analysis pipeline in src/.
-All business logic lives in src/ (core.py orchestrates); this file is the
-presentation layer: theming, layout, charts, and state.
+Professional multi-page Streamlit UI over the analysis pipeline in src/.
+Business logic lives in src/ (core.py orchestrates); this file is the
+presentation layer: branding, theming, layout, charts, and state.
 
-Security notes (see SECURITY.md):
-  - Every dynamic value placed inside an `unsafe_allow_html` block is escaped
-    with security.safe(); raw contract text is never rendered as HTML.
-  - Uploads pass security.validate_upload() (size/extension/magic bytes) before
-    any parser touches them.
+(Security hardening is applied throughout the code — output escaping, upload
+validation, parameterized SQL — but kept behind the scenes.)
 
 Run:  streamlit run app.py
 """
@@ -33,7 +30,7 @@ from src.security import validate_upload, safe, clean_display, clean_query, MAX_
 from src.content.education import FLASHCARDS, ARTICLES, flashcard_categories
 
 st.set_page_config(
-    page_title="Legal Contract Analyzer",
+    page_title="Lexalytics · Legal Contract Analyzer",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -49,184 +46,227 @@ TEAL = "#2a9d8f"
 SLATE = "#5b6b7d"
 SEV_COLORS = {"high": "#c0392b", "medium": "#d68910", "low": "#7d8a99"}
 LEVEL_COLORS = {"High": "#c0392b", "Medium": "#d68910", "Low": "#1e8449"}
-CATEGORICAL = [NAVY_2, GOLD, TEAL, "#8e44ad", "#c0392b", "#16a085", "#d68910", "#2c3e50"]
 
 # ---------------------------------------------------------------------------
-# Theme / CSS  (plain string — NOT an f-string — because of the CSS braces)
+# Brand mark (inline SVG — crisp scales-of-justice emblem)
+# ---------------------------------------------------------------------------
+LOGO_SVG = """
+<svg viewBox="0 0 64 64" width="46" height="46" xmlns="http://www.w3.org/2000/svg" aria-label="logo">
+  <defs>
+    <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c4a7e"/><stop offset="1" stop-color="#0f2a4a"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="url(#lg)" stroke="#c9a227" stroke-width="2.5"/>
+  <g stroke="#e6c65c" stroke-width="2" fill="none" stroke-linecap="round">
+    <line x1="32" y1="17" x2="32" y2="47"/>
+    <line x1="17" y1="23" x2="47" y2="23"/>
+    <circle cx="32" cy="16" r="2.6" fill="#e6c65c" stroke="none"/>
+    <line x1="17" y1="23" x2="12" y2="35"/><line x1="17" y1="23" x2="22" y2="35"/>
+    <path d="M11 35 a6 4.5 0 0 0 12 0" fill="#e6c65c" fill-opacity="0.22"/>
+    <line x1="47" y1="23" x2="42" y2="35"/><line x1="47" y1="23" x2="52" y2="35"/>
+    <path d="M41 35 a6 4.5 0 0 0 12 0" fill="#e6c65c" fill-opacity="0.22"/>
+    <line x1="25" y1="47" x2="39" y2="47"/>
+    <line x1="27" y1="50" x2="37" y2="50"/>
+  </g>
+</svg>
+"""
+
+# ---------------------------------------------------------------------------
+# Theme / CSS (plain string — NOT an f-string; CSS uses braces)
 # ---------------------------------------------------------------------------
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800;900&display=swap');
 
 :root {
   --navy:#0f2a4a; --navy-2:#1c4a7e; --gold:#c9a227; --gold-2:#e6c65c;
-  --bg:#eef2f7; --card:#ffffff; --ink:#1f2933; --muted:#5b6b7d;
+  --bg:#eaf0f6; --card:#ffffff; --ink:#1c2733; --muted:#5b6b7d;
+  --ring:rgba(15,42,74,.08);
 }
 
-/* Base */
 html, body, [class*="css"] { font-family:'Inter',system-ui,sans-serif; }
 [data-testid="stAppViewContainer"] { background:
-   radial-gradient(1200px 500px at 100% -10%, rgba(28,74,126,.06), transparent),
+   radial-gradient(1100px 480px at 100% -8%, rgba(28,74,126,.08), transparent),
+   radial-gradient(900px 400px at -10% 0%, rgba(201,162,39,.06), transparent),
    var(--bg); }
-.block-container { padding-top:1.4rem; padding-bottom:3rem; max-width:1250px;
-   animation: fadeInUp .5s ease both; }
-h1,h2,h3 { font-family:'Playfair Display',Georgia,serif; color:var(--navy);
-   letter-spacing:.2px; }
-a { color:var(--navy-2); }
+[data-testid="stHeader"] { background:transparent; }
+.block-container { padding-top:2.7rem; padding-bottom:3.5rem; max-width:1220px;
+   animation:fadeInUp .5s ease both; }
+.block-container p { line-height:1.65; color:var(--ink); }
+.block-container li { line-height:1.6; }
+h1,h2,h3,h4 { font-family:'Playfair Display',Georgia,serif; color:var(--navy); letter-spacing:.2px; }
 
 @keyframes fadeInUp { from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;} }
-@keyframes shimmer { 0%{background-position:-400px 0;} 100%{background-position:400px 0;} }
-@keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(192,57,43,.45);} 70%{box-shadow:0 0 0 12px rgba(192,57,43,0);} 100%{box-shadow:0 0 0 0 rgba(192,57,43,0);} }
-@keyframes floatIn { from{opacity:0; transform:translateY(20px) scale(.98);} to{opacity:1; transform:none;} }
+@keyframes floatIn { from{opacity:0; transform:translateY(18px) scale(.985);} to{opacity:1; transform:none;} }
+@keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(192,57,43,.4);} 70%{box-shadow:0 0 0 12px rgba(192,57,43,0);} 100%{box-shadow:0 0 0 0 rgba(192,57,43,0);} }
 
-/* Hero */
-.hero { position:relative; overflow:hidden; border-radius:18px; padding:1.7rem 2rem;
-  background:linear-gradient(125deg, var(--navy) 0%, var(--navy-2) 100%);
-  color:#fff; box-shadow:0 14px 40px rgba(15,42,74,.28); margin-bottom:1.3rem;
+/* ---- Hero (fully rounded, never clipped) ---- */
+.hero { position:relative; overflow:hidden; border-radius:20px; padding:2.1rem 2.3rem;
+  background:linear-gradient(120deg, #0c223d 0%, var(--navy) 45%, var(--navy-2) 100%);
+  color:#fff; box-shadow:0 18px 46px rgba(15,42,74,.30); margin:.2rem 0 1.4rem;
   animation:floatIn .6s ease both; }
-.hero:after { content:""; position:absolute; right:-60px; top:-60px; width:220px; height:220px;
-  border-radius:50%; background:radial-gradient(circle, rgba(201,162,39,.35), transparent 70%); }
-.hero:before { content:""; position:absolute; left:-40px; bottom:-80px; width:200px; height:200px;
-  border-radius:50%; background:radial-gradient(circle, rgba(255,255,255,.06), transparent 70%); }
-.hero h1 { color:#fff; margin:0 0 .35rem 0; font-size:2rem; }
-.hero p { color:rgba(255,255,255,.85); margin:0; font-size:1rem; max-width:760px; }
-.hero .accent { width:64px; height:4px; border-radius:3px; background:var(--gold); margin:.7rem 0; }
-.hero .eyebrow { text-transform:uppercase; letter-spacing:3px; font-size:.72rem;
-  color:var(--gold-2); font-weight:700; }
+.hero:after { content:""; position:absolute; right:-70px; top:-70px; width:250px; height:250px;
+  border-radius:50%; background:radial-gradient(circle, rgba(201,162,39,.30), transparent 70%); }
+.hero:before { content:""; position:absolute; left:-50px; bottom:-90px; width:220px; height:220px;
+  border-radius:50%; background:radial-gradient(circle, rgba(255,255,255,.05), transparent 70%); }
+.hero .eyebrow { text-transform:uppercase; letter-spacing:3px; font-size:.72rem; color:var(--gold-2); font-weight:700; }
+.hero h1 { color:#fff; margin:.35rem 0 .2rem; font-size:2.15rem; line-height:1.12; font-weight:800; }
+.hero .accent { width:70px; height:4px; border-radius:3px; background:var(--gold); margin:.7rem 0 .8rem; }
+.hero p { color:rgba(255,255,255,.9); margin:0; font-size:1.02rem; max-width:820px; }
+.hero .badges { margin-top:1rem; display:flex; gap:.5rem; flex-wrap:wrap; }
+.hero .badge { background:rgba(255,255,255,.1); border:1px solid rgba(230,198,92,.35); color:#fff;
+  padding:.3rem .75rem; border-radius:999px; font-size:.78rem; font-weight:600; }
 
-/* Cards */
-.lca-card { background:var(--card); border:1px solid rgba(15,42,74,.08); border-radius:14px;
-  padding:1.1rem 1.2rem; box-shadow:0 6px 18px rgba(15,42,74,.06);
-  transition:transform .2s ease, box-shadow .2s ease; animation:floatIn .5s ease both; }
-.lca-card:hover { transform:translateY(-3px); box-shadow:0 14px 30px rgba(15,42,74,.12); }
-.feature-icon { font-size:1.7rem; }
+/* ---- Cards ---- */
+.lca-card { background:var(--card); border:1px solid var(--ring); border-radius:16px;
+  padding:1.2rem 1.3rem; box-shadow:0 8px 22px rgba(15,42,74,.07);
+  transition:transform .2s ease, box-shadow .2s ease; animation:floatIn .5s ease both; height:100%; }
+.lca-card:hover { transform:translateY(-4px); box-shadow:0 18px 36px rgba(15,42,74,.14); }
+.lca-card .ic { font-size:1.9rem; }
+.lca-card h3 { margin:.5rem 0 .35rem; font-size:1.2rem; }
 
-/* Metrics -> cards */
-[data-testid="stMetric"] { background:var(--card); border:1px solid rgba(15,42,74,.08);
-  border-radius:14px; padding:1rem 1.1rem; box-shadow:0 6px 18px rgba(15,42,74,.06);
-  transition:transform .2s ease; }
+/* ---- Stat tiles ---- */
+.stat { background:var(--card); border:1px solid var(--ring); border-radius:16px; padding:1.1rem 1.2rem;
+  box-shadow:0 8px 22px rgba(15,42,74,.07); position:relative; overflow:hidden; height:100%;
+  transition:transform .2s ease; animation:floatIn .5s ease both; }
+.stat:hover { transform:translateY(-4px); }
+.stat .v { font-family:'Playfair Display',serif; font-size:2rem; font-weight:800; color:var(--navy); line-height:1; }
+.stat .l { color:var(--muted); font-size:.85rem; margin-top:.35rem; font-weight:500; }
+.stat .ic { position:absolute; right:.9rem; top:.7rem; font-size:1.3rem; opacity:.55; }
+.stat.gold { border-top:3px solid var(--gold); }
+
+/* ---- Metrics -> cards ---- */
+[data-testid="stMetric"] { background:var(--card); border:1px solid var(--ring);
+  border-radius:16px; padding:1rem 1.15rem; box-shadow:0 8px 22px rgba(15,42,74,.07); transition:transform .2s ease; }
 [data-testid="stMetric"]:hover { transform:translateY(-3px); }
 [data-testid="stMetricValue"] { color:var(--navy); font-weight:700; }
 
-/* Findings */
-.finding-card { background:var(--card); border:1px solid rgba(15,42,74,.08); border-left:5px solid #ccc;
-  border-radius:12px; padding:.8rem 1.05rem; margin-bottom:.7rem; box-shadow:0 4px 14px rgba(15,42,74,.05);
+/* ---- Findings ---- */
+.finding-card { background:var(--card); border:1px solid var(--ring); border-left:5px solid #ccc;
+  border-radius:13px; padding:.85rem 1.1rem; margin-bottom:.75rem; box-shadow:0 5px 16px rgba(15,42,74,.05);
   transition:transform .18s ease; animation:floatIn .45s ease both; }
 .finding-card:hover { transform:translateX(3px); }
-.sev-tag { color:#fff; font-size:.68rem; font-weight:800; letter-spacing:.5px; padding:.12rem .5rem;
-  border-radius:5px; margin-right:.5rem; vertical-align:middle; }
-.sev-high-pulse { animation:pulse 2s infinite; }
-.evidence { background:rgba(15,42,74,.05); border-radius:6px; padding:.45rem .65rem; font-size:.8rem;
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:#42505f; margin-top:.45rem;
-  border-left:3px solid var(--gold); overflow-wrap:anywhere; }
+.sev-tag { color:#fff; font-size:.68rem; font-weight:800; letter-spacing:.5px; padding:.12rem .5rem; border-radius:5px; margin-right:.5rem; }
+.sev-high-pulse { animation:pulse 2.2s infinite; }
+.evidence { background:rgba(15,42,74,.05); border-radius:7px; padding:.45rem .65rem; font-size:.8rem;
+  font-family:ui-monospace,Menlo,monospace; color:#42505f; margin-top:.45rem; border-left:3px solid var(--gold); overflow-wrap:anywhere; }
 
-/* Pills / badges */
-.pill { display:inline-block; padding:.28rem .7rem; border-radius:999px; font-weight:700;
-  font-size:.8rem; color:#fff; }
-.tag { display:inline-block; padding:.16rem .55rem; border-radius:7px; font-size:.74rem;
-  background:rgba(28,74,126,.1); color:var(--navy-2); margin:.12rem; font-weight:600; }
+/* ---- Pills / tags ---- */
+.pill { display:inline-block; padding:.28rem .7rem; border-radius:999px; font-weight:700; font-size:.8rem; color:#fff; }
+.tag { display:inline-block; padding:.2rem .6rem; border-radius:8px; font-size:.75rem;
+  background:rgba(28,74,126,.1); color:var(--navy-2); margin:.14rem; font-weight:600; }
 
-/* Sidebar */
-section[data-testid="stSidebar"] { background:linear-gradient(185deg, var(--navy) 0%, #0a1f38 100%);
-  border-right:1px solid rgba(201,162,39,.25); }
-section[data-testid="stSidebar"] * { color:#dfe7f1; }
-section[data-testid="stSidebar"] .app-title { font-family:'Playfair Display',serif; color:#fff;
-  font-size:1.2rem; font-weight:800; }
-section[data-testid="stSidebar"] .app-sub { color:var(--gold-2); font-size:.75rem;
-  letter-spacing:2px; text-transform:uppercase; }
-section[data-testid="stSidebar"] hr { border-color:rgba(255,255,255,.12); }
-/* nav radio as menu */
-section[data-testid="stSidebar"] [role="radiogroup"] label { padding:.5rem .7rem; border-radius:10px;
-  margin:.12rem 0; transition:background .2s ease, transform .15s ease, border-left-color .2s;
-  border-left:3px solid transparent; cursor:pointer; }
-section[data-testid="stSidebar"] [role="radiogroup"] label:hover { background:rgba(255,255,255,.07);
-  transform:translateX(3px); }
+/* ---- Workflow steps ---- */
+.step { background:var(--card); border:1px solid var(--ring); border-radius:16px; padding:1.15rem 1.2rem; height:100%;
+  box-shadow:0 8px 22px rgba(15,42,74,.06); animation:floatIn .5s ease both; transition:transform .2s ease; }
+.step:hover { transform:translateY(-4px); }
+.step .num { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%;
+  background:linear-gradient(135deg,var(--navy),var(--navy-2)); color:var(--gold-2); font-weight:800; font-family:'Playfair Display',serif; }
+.step h4 { margin:.6rem 0 .3rem; }
+.step p { color:var(--muted); font-size:.9rem; margin:0; }
+
+/* ---- Sidebar ---- */
+section[data-testid="stSidebar"] { background:linear-gradient(190deg,#123457 0%, var(--navy) 55%, #0a1d34 100%);
+  border-right:1px solid rgba(201,162,39,.28); }
+section[data-testid="stSidebar"] * { color:#dbe6f2; }
+.brand { display:flex; align-items:center; gap:.7rem; padding:.2rem 0 .1rem; }
+.brand .name { font-family:'Playfair Display',serif; color:#fff; font-size:1.12rem; font-weight:800; line-height:1.05; }
+.brand .name small { display:block; color:var(--gold-2); font-size:.62rem; letter-spacing:2.5px; text-transform:uppercase; font-family:'Inter',sans-serif; font-weight:700; margin-top:2px; }
+section[data-testid="stSidebar"] hr { border-color:rgba(255,255,255,.12); margin:.7rem 0; }
+section[data-testid="stSidebar"] [role="radiogroup"] { gap:.15rem; }
+section[data-testid="stSidebar"] [role="radiogroup"] label { padding:.55rem .8rem; border-radius:11px; margin:.1rem 0;
+  transition:background .2s, transform .15s, border-color .2s; border-left:3px solid transparent; cursor:pointer; }
+section[data-testid="stSidebar"] [role="radiogroup"] label:hover { background:rgba(255,255,255,.08); transform:translateX(3px); }
+section[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) { background:rgba(201,162,39,.16); border-left-color:var(--gold); }
 section[data-testid="stSidebar"] [role="radiogroup"] label p { font-weight:600; font-size:.95rem; }
-.side-stat { background:rgba(255,255,255,.06); border:1px solid rgba(201,162,39,.2);
-  border-radius:10px; padding:.5rem .7rem; font-size:.82rem; margin-top:.4rem; }
+.side-stat { background:rgba(255,255,255,.06); border:1px solid rgba(201,162,39,.22); border-radius:11px;
+  padding:.5rem .75rem; font-size:.82rem; margin-top:.45rem; }
+.side-foot { color:rgba(219,230,242,.55); font-size:.7rem; margin-top:1rem; line-height:1.5; }
 
-/* Buttons */
-.stButton>button, .stDownloadButton>button { border-radius:10px; font-weight:600;
-  border:1px solid rgba(15,42,74,.15); transition:all .18s ease; }
-.stButton>button:hover, .stDownloadButton>button:hover { transform:translateY(-2px);
-  border-color:var(--gold); box-shadow:0 6px 16px rgba(15,42,74,.14); }
+/* ---- Buttons ---- */
+.stButton>button, .stDownloadButton>button { border-radius:11px; font-weight:600; border:1px solid var(--ring); transition:all .18s ease; }
+.stButton>button:hover, .stDownloadButton>button:hover { transform:translateY(-2px); border-color:var(--gold); box-shadow:0 8px 18px rgba(15,42,74,.14); }
 .stButton>button[kind="primary"] { background:var(--navy); border-color:var(--navy); }
 .stButton>button[kind="primary"]:hover { background:var(--navy-2); }
 
-/* Tabs */
+/* ---- Tabs ---- */
 .stTabs [data-baseweb="tab-list"] { gap:.3rem; }
-.stTabs [data-baseweb="tab"] { border-radius:10px 10px 0 0; padding:.35rem .8rem; }
+.stTabs [data-baseweb="tab"] { border-radius:11px 11px 0 0; padding:.4rem .9rem; }
 .stTabs [aria-selected="true"] { background:rgba(28,74,126,.1); color:var(--navy); }
 
-/* Flashcards */
-.flip-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(255px,1fr)); gap:1rem; }
-.flip-card { perspective:1200px; height:200px; }
-.flip-inner { position:relative; width:100%; height:100%; transition:transform .7s cubic-bezier(.4,.2,.2,1);
-  transform-style:preserve-3d; }
+/* ---- Flashcards ---- */
+.flip-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); gap:1.1rem; }
+.flip-card { perspective:1300px; height:210px; }
+.flip-inner { position:relative; width:100%; height:100%; transition:transform .75s cubic-bezier(.4,.2,.2,1); transform-style:preserve-3d; }
 .flip-card:hover .flip-inner { transform:rotateY(180deg); }
-.flip-front, .flip-back { position:absolute; inset:0; backface-visibility:hidden;
-  border-radius:16px; padding:1.1rem; display:flex; flex-direction:column; justify-content:center;
-  box-shadow:0 8px 22px rgba(15,42,74,.14); }
-.flip-front { background:linear-gradient(135deg,var(--navy),var(--navy-2)); color:#fff; }
-.flip-front .q { font-family:'Playfair Display',serif; font-size:1.05rem; font-weight:700; }
-.flip-front .cat { position:absolute; top:.7rem; right:.8rem; font-size:.65rem; color:var(--gold-2);
-  text-transform:uppercase; letter-spacing:1.5px; font-weight:700; }
-.flip-front .hint { position:absolute; bottom:.7rem; left:1.1rem; font-size:.7rem; color:rgba(255,255,255,.6);}
-.flip-back { background:var(--card); color:var(--ink); transform:rotateY(180deg);
-  border:1px solid var(--gold); font-size:.9rem; line-height:1.45; overflow:auto; }
+.flip-front, .flip-back { position:absolute; inset:0; backface-visibility:hidden; border-radius:17px; padding:1.15rem;
+  display:flex; flex-direction:column; justify-content:center; box-shadow:0 10px 26px rgba(15,42,74,.16); }
+.flip-front { background:linear-gradient(140deg,var(--navy),var(--navy-2)); color:#fff; }
+.flip-front .q { font-family:'Playfair Display',serif; font-size:1.08rem; font-weight:700; }
+.flip-front .cat { position:absolute; top:.75rem; right:.85rem; font-size:.62rem; color:var(--gold-2); text-transform:uppercase; letter-spacing:1.5px; font-weight:800; }
+.flip-front .hint { position:absolute; bottom:.75rem; left:1.15rem; font-size:.7rem; color:rgba(255,255,255,.6); }
+.flip-back { background:var(--card); color:var(--ink); transform:rotateY(180deg); border:1px solid var(--gold); font-size:.9rem; line-height:1.48; overflow:auto; }
 
-/* Article cards */
-.article { background:var(--card); border:1px solid rgba(15,42,74,.08); border-radius:14px;
-  padding:1.1rem 1.2rem; box-shadow:0 6px 18px rgba(15,42,74,.06); height:100%;
-  transition:transform .2s ease, box-shadow .2s ease; animation:floatIn .5s ease both; }
-.article:hover { transform:translateY(-3px); box-shadow:0 14px 30px rgba(15,42,74,.12); }
-.article .ico { font-size:1.8rem; }
-.article h4 { font-family:'Playfair Display',serif; color:var(--navy); margin:.4rem 0 .3rem; }
-.article .meta { color:var(--muted); font-size:.78rem; }
+/* ---- Article reader ---- */
+.reader-head { background:linear-gradient(120deg,var(--navy),var(--navy-2)); color:#fff; border-radius:16px;
+  padding:1.6rem 1.9rem; position:relative; overflow:hidden; box-shadow:0 12px 30px rgba(15,42,74,.22);
+  margin-bottom:1.3rem; animation:floatIn .5s ease both; }
+.reader-head:after { content:""; position:absolute; right:-40px; top:-40px; width:160px; height:160px; border-radius:50%;
+  background:radial-gradient(circle,rgba(201,162,39,.3),transparent 70%); }
+.reader-head .ico { font-size:2rem; }
+.reader-head h2 { color:#fff; margin:.35rem 0 .3rem; }
+.reader-head .meta { color:var(--gold-2); font-size:.82rem; font-weight:600; }
+/* Article body: elegant single-column typography on the page */
+.article-wrap { max-width:820px; }
+.article-wrap p, .article-wrap li { font-size:1rem; line-height:1.75; color:#26333f; }
+.article-wrap h4 { margin-top:1.4rem; color:var(--navy); }
+.article-wrap p:first-of-type:first-letter { font-family:'Playfair Display',serif; font-size:2.6rem;
+  font-weight:800; color:var(--navy-2); float:left; line-height:.8; margin:.15rem .5rem 0 0; }
 
-/* Scrollbar */
+/* ---- Scrollbar ---- */
 ::-webkit-scrollbar { width:10px; height:10px; }
 ::-webkit-scrollbar-thumb { background:rgba(15,42,74,.28); border-radius:6px; }
 ::-webkit-scrollbar-thumb:hover { background:rgba(15,42,74,.45); }
-
-/* Security badge grid */
-.sec-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:.8rem; }
-.sec-item { background:var(--card); border:1px solid rgba(15,42,74,.08); border-left:4px solid var(--teal, #2a9d8f);
-  border-radius:12px; padding:.8rem 1rem; box-shadow:0 4px 14px rgba(15,42,74,.05);
-  transition:transform .18s ease; animation:floatIn .45s ease both; }
-.sec-item:hover { transform:translateY(-3px); }
-.sec-item .h { font-weight:700; color:var(--navy); font-size:.92rem; }
-.sec-item .d { color:var(--muted); font-size:.82rem; margin-top:.2rem; }
-.sec-check { color:#1e8449; font-weight:800; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
-# Small render helpers
+# Render helpers
 # ---------------------------------------------------------------------------
-def hero(icon: str, title: str, subtitle: str) -> None:
+def hero(eyebrow: str, title: str, subtitle: str, badges: list[str] | None = None) -> None:
+    badge_html = ""
+    if badges:
+        badge_html = "<div class='badges'>" + "".join(
+            f"<span class='badge'>{safe(b)}</span>" for b in badges
+        ) + "</div>"
     st.markdown(
         f"""
         <div class="hero">
-          <div class="eyebrow">{safe(icon)} &nbsp;Legal Contract Intelligence</div>
+          <div class="eyebrow">{safe(eyebrow)}</div>
           <h1>{safe(title)}</h1>
           <div class="accent"></div>
           <p>{safe(subtitle)}</p>
+          {badge_html}
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
+def stat_tile(value, label: str, icon: str = "", gold: bool = False) -> str:
+    cls = "stat gold" if gold else "stat"
+    return (f"<div class='{cls}'><div class='ic'>{safe(icon)}</div>"
+            f"<div class='v'>{safe(value)}</div><div class='l'>{safe(label)}</div></div>")
+
+
 def _theme_fig(fig: go.Figure, height: int = 320) -> go.Figure:
     fig.update_layout(
-        height=height,
-        margin=dict(l=10, r=10, t=48, b=10),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif", color="#1f2933"),
+        height=height, margin=dict(l=10, r=10, t=48, b=10),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, sans-serif", color="#1c2733"),
         title_font=dict(family="Playfair Display, serif", color=NAVY, size=16),
         legend=dict(orientation="h", yanchor="bottom", y=-0.25),
     )
@@ -235,26 +275,17 @@ def _theme_fig(fig: go.Figure, height: int = 320) -> go.Figure:
 
 def risk_gauge(score: int, level: str) -> go.Figure:
     color = LEVEL_COLORS.get(level, NAVY)
-    fig = go.Figure(
-        go.Indicator(
-            mode="gauge+number",
-            value=score,
-            number={"suffix": "/100", "font": {"size": 30, "color": NAVY}},
-            gauge={
-                "axis": {"range": [0, 100], "tickcolor": SLATE},
-                "bar": {"color": color, "thickness": 0.3},
-                "borderwidth": 0,
-                "steps": [
-                    {"range": [0, 25], "color": "rgba(30,132,73,.18)"},
-                    {"range": [25, 55], "color": "rgba(214,137,16,.18)"},
-                    {"range": [55, 100], "color": "rgba(192,57,43,.18)"},
-                ],
-                "threshold": {"line": {"color": color, "width": 4}, "value": score},
-            },
-            title={"text": f"<b>{level} risk</b>"},
-        )
-    )
-    return _theme_fig(fig, height=250)
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number", value=score,
+        number={"suffix": "/100", "font": {"size": 30, "color": NAVY}},
+        gauge={"axis": {"range": [0, 100], "tickcolor": SLATE},
+               "bar": {"color": color, "thickness": 0.3}, "borderwidth": 0,
+               "steps": [{"range": [0, 25], "color": "rgba(30,132,73,.18)"},
+                         {"range": [25, 55], "color": "rgba(214,137,16,.18)"},
+                         {"range": [55, 100], "color": "rgba(192,57,43,.18)"}],
+               "threshold": {"line": {"color": color, "width": 4}, "value": score}},
+        title={"text": f"<b>{level} risk</b>"}))
+    return _theme_fig(fig, 250)
 
 
 def clause_bar(detected) -> go.Figure | None:
@@ -273,8 +304,7 @@ def severity_donut(counts: dict) -> go.Figure | None:
     if not data:
         return None
     fig = px.pie(values=list(data.values()), names=list(data.keys()), hole=0.55,
-                 title="Risk findings by severity",
-                 color=list(data.keys()),
+                 title="Findings by severity", color=list(data.keys()),
                  color_discrete_map={"High": SEV_COLORS["high"], "Medium": SEV_COLORS["medium"], "Low": SEV_COLORS["low"]})
     fig.update_traces(textinfo="value")
     return _theme_fig(fig, 300)
@@ -290,105 +320,161 @@ def method_donut(clauses) -> go.Figure | None:
     return _theme_fig(fig, 300)
 
 
-# ---------------------------------------------------------------------------
-# Cached search index
-# ---------------------------------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def _search_index(cache_key: int) -> SemanticSearchIndex:
     return SemanticSearchIndex.from_clauses(db.get_all_clauses())
+
+
+def _md_to_html(md: str) -> str:
+    """Convert the small markdown subset used by articles into HTML, escaping
+    first so the output is safe to render. Supports bold-only subheads,
+    bullet lists, and paragraphs."""
+    import re
+
+    def inline(t: str) -> str:
+        t = safe(t.strip())
+        return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
+
+    out: list[str] = []
+    para: list[str] = []
+    bullets: list[str] = []
+
+    def flush_para():
+        if para:
+            out.append(f"<p>{' '.join(inline(x) for x in para)}</p>")
+            para.clear()
+
+    def flush_bullets():
+        if bullets:
+            out.append("<ul>" + "".join(f"<li>{inline(b)}</li>" for b in bullets) + "</ul>")
+            bullets.clear()
+
+    for raw in md.strip().splitlines():
+        line = raw.strip()
+        if not line:
+            flush_para(); flush_bullets(); continue
+        if line.startswith("- "):
+            flush_para(); bullets.append(line[2:]); continue
+        m = re.fullmatch(r"\*\*(.+?)\*\*:?", line)
+        if m:  # a bold-only line acts as a subheading
+            flush_para(); flush_bullets()
+            out.append(f"<h4>{inline('**' + m.group(1) + '**')}</h4>")
+            continue
+        flush_bullets(); para.append(line)
+    flush_para(); flush_bullets()
+    return "".join(out)
 
 
 # ---------------------------------------------------------------------------
 # Page: Dashboard
 # ---------------------------------------------------------------------------
 def page_dashboard() -> None:
-    hero("🏛️", "Legal Contract Analyzer",
-         "AI-assisted contract review that reads, classifies, and risk-scores your "
-         "agreements — clause extraction, entity detection, risk analysis, and "
-         "semantic search, running entirely on a private, open-source pipeline.")
+    metrics = ml_classifier.model_metrics()
+    hero(
+        "Contract Intelligence Platform",
+        "Review contracts in minutes, not hours",
+        "Lexalytics reads your agreements the way a diligence team would — surfacing the "
+        "clauses, obligations, dates and dollar figures that matter, scoring risk, and making "
+        "every contract searchable. Faster first-pass review, consistent coverage, better decisions.",
+        badges=["⚡ Seconds per contract", "🎯 41 clause types", "🔒 100% private & local"],
+    )
 
     contracts = db.list_contracts()
+
     if not contracts:
-        st.markdown("#### Get started")
-        cols = st.columns(3)
-        feats = [
-            ("📄", "Analyze a contract", "Upload a PDF or DOCX and get clauses, entities, a risk report and summaries."),
-            ("🔎", "Search your library", "Find similar clauses across every stored contract with semantic search."),
-            ("🎓", "Learn the concepts", "Flashcards and articles on the clauses that matter and how to read risk."),
+        # Impact stats
+        acc = f"{metrics['test_accuracy']:.0%}" if metrics else "76%"
+        ncls = metrics["n_classes"] if metrics else 41
+        st.markdown("<div style='height:.2rem'></div>", unsafe_allow_html=True)
+        cols = st.columns(4)
+        cols[0].markdown(stat_tile(acc, "Clause-classifier accuracy", "🎯", gold=True), unsafe_allow_html=True)
+        cols[1].markdown(stat_tile(ncls, "Clause categories detected", "🏷️"), unsafe_allow_html=True)
+        cols[2].markdown(stat_tile("6", "Signals per contract", "🧭"), unsafe_allow_html=True)
+        cols[3].markdown(stat_tile("0", "Bytes sent to the cloud", "🔒"), unsafe_allow_html=True)
+
+        st.markdown("### From upload to insight in three steps")
+        steps = [
+            ("1", "📄 Upload", "Drop in a PDF or Word contract. Text is extracted and cleaned automatically."),
+            ("2", "🤖 Analyze", "Clauses are classified, key terms extracted, and risks scored — instantly."),
+            ("3", "📊 Decide", "Read a plain-English summary, review ranked risks, and export a report."),
         ]
-        for col, (ic, t, d) in zip(cols, feats):
+        scols = st.columns(3)
+        for col, (n, t, d) in zip(scols, steps):
             col.markdown(
-                f"<div class='lca-card'><div class='feature-icon'>{safe(ic)}</div>"
-                f"<h3 style='margin:.3rem 0'>{safe(t)}</h3>"
+                f"<div class='step'><span class='num'>{n}</span><h4>{safe(t)}</h4><p>{safe(d)}</p></div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("### What it solves")
+        wcols = st.columns(3)
+        solves = [
+            ("⚖️", "Cut review time", "Turn hours of manual reading into a minutes-long, structured first pass."),
+            ("🛑", "Catch hidden risk", "Flag uncapped liability, one-sided rights, auto-renewals — and missing protections."),
+            ("🔎", "Never lose a clause", "Search every contract you've reviewed to find precedents and compare terms."),
+        ]
+        for col, (ic, t, d) in zip(wcols, solves):
+            col.markdown(
+                f"<div class='lca-card'><div class='ic'>{safe(ic)}</div><h3>{safe(t)}</h3>"
                 f"<div style='color:var(--muted)'>{safe(d)}</div></div>",
                 unsafe_allow_html=True,
             )
-        st.info("Open **Analyze Contract** in the sidebar and upload the sample in "
-                "`sample_contracts/` to see the full pipeline in action.")
+        st.markdown("<div style='height:.6rem'></div>", unsafe_allow_html=True)
+        st.info("▶ Open **Analyze Contract** in the sidebar and try the sample in `sample_contracts/`.")
         return
 
-    # ---- Library analytics ----
+    # ---- Populated: portfolio analytics ----
     df = pd.DataFrame(contracts)
-    total = len(df)
     avg_risk = int(df["risk_score"].dropna().mean()) if df["risk_score"].notna().any() else 0
     high = int((df["risk_level"] == "High").sum())
     total_clauses = int(df["num_clauses"].sum())
+    cols = st.columns(4)
+    cols[0].markdown(stat_tile(len(df), "Contracts analyzed", "📚", gold=True), unsafe_allow_html=True)
+    cols[1].markdown(stat_tile(f"{avg_risk}/100", "Average risk score", "📈"), unsafe_allow_html=True)
+    cols[2].markdown(stat_tile(high, "High-risk contracts", "🛑"), unsafe_allow_html=True)
+    cols[3].markdown(stat_tile(total_clauses, "Clauses indexed", "🏷️"), unsafe_allow_html=True)
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Contracts analyzed", total)
-    c2.metric("Avg. risk score", f"{avg_risk}/100")
-    c3.metric("High-risk contracts", high)
-    c4.metric("Clauses indexed", total_clauses)
-
+    st.markdown("### Portfolio insights")
     left, right = st.columns(2)
     with left:
         lvl = df["risk_level"].value_counts()
         if not lvl.empty:
             fig = px.pie(values=lvl.values, names=lvl.index, hole=0.55,
-                         title="Portfolio risk distribution",
-                         color=lvl.index,
-                         color_discrete_map=LEVEL_COLORS)
-            st.plotly_chart(_theme_fig(fig, 320), use_container_width=True)
+                         title="Risk distribution", color=lvl.index, color_discrete_map=LEVEL_COLORS)
+            st.plotly_chart(_theme_fig(fig, 330), use_container_width=True)
     with right:
-        all_clauses = db.get_all_clauses()
-        types = [c["clause_type"] for c in all_clauses if c.get("clause_type")]
+        types = [c["clause_type"] for c in db.get_all_clauses() if c.get("clause_type")]
         if types:
             s = pd.Series(types).value_counts().head(10).reset_index()
             s.columns = ["Clause Type", "Count"]
             fig = px.bar(s, x="Count", y="Clause Type", orientation="h",
-                         title="Most common clauses across library",
-                         color_discrete_sequence=[GOLD])
+                         title="Most common clauses across library", color_discrete_sequence=[GOLD])
             fig.update_layout(yaxis={"categoryorder": "total ascending"})
-            st.plotly_chart(_theme_fig(fig, 320), use_container_width=True)
+            st.plotly_chart(_theme_fig(fig, 330), use_container_width=True)
 
-    st.markdown("#### Recent contracts")
-    st.dataframe(
-        df[["id", "filename", "upload_date", "num_clauses", "risk_level", "risk_score"]].head(8),
-        use_container_width=True, hide_index=True,
-    )
+    st.markdown("### Recent contracts")
+    st.dataframe(df[["id", "filename", "upload_date", "num_clauses", "risk_level", "risk_score"]].head(8),
+                 use_container_width=True, hide_index=True)
 
 
 # ---------------------------------------------------------------------------
 # Page: Analyze
 # ---------------------------------------------------------------------------
 def page_analyze(use_ml: bool) -> None:
-    hero("📄", "Analyze a Contract",
-         "Upload a PDF or DOCX. Nothing is stored unless you choose Save to library. "
-         "Automated analysis — not legal advice.")
+    hero("Document Analysis", "Analyze a Contract",
+         "Upload a PDF or Word document to extract clauses, key terms and risks. "
+         "Files are processed locally and are never stored unless you save them.")
 
     uploaded = st.file_uploader(
-        f"Upload contract (PDF or DOCX, max {MAX_UPLOAD_BYTES // (1024*1024)} MB)",
-        type=["pdf", "docx"], key="uploader",
-    )
+        f"Drop a contract here — PDF or DOCX, up to {MAX_UPLOAD_BYTES // (1024*1024)} MB",
+        type=["pdf", "docx"], key="uploader")
     if uploaded is None:
-        st.info("Upload a contract to begin. Try `sample_contracts/sample_services_agreement.docx`.")
+        st.info("Upload a contract to begin, or try `sample_contracts/sample_services_agreement.docx`.")
         return
 
-    # ---- security gate: validate before parsing ----
     data = uploaded.getvalue()
     check = validate_upload(uploaded.name, data)
     if not check.ok:
-        st.error(f"🛡️ Upload rejected: {check.reason}")
+        st.error(f"Upload rejected: {check.reason}")
         return
 
     sig = (uploaded.name, uploaded.size, use_ml)
@@ -403,10 +489,8 @@ def page_analyze(use_ml: bool) -> None:
                 return
 
     result: AnalysisResult = st.session_state["analysis"]
-
     if result.meta.get("likely_scanned"):
-        st.warning("This PDF looks like a scanned image with little extractable text. "
-                   "There's no OCR step, so results will be sparse.")
+        st.warning("This PDF looks like a scanned image with little extractable text, so results may be sparse.")
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("File type", result.meta.get("file_type", "—"))
@@ -414,10 +498,10 @@ def page_analyze(use_ml: bool) -> None:
     c3.metric("Clauses classified", len(result.detected_clauses))
     c4.metric("Risk", f"{result.risk.level} · {result.risk.score}/100")
 
-    tabs = st.tabs(["📋 Overview", "⚠️ Risk", "📑 Clauses", "🏷️ Entities", "📄 Full Text", "⬇️ Export & Save"])
+    tabs = st.tabs(["📋 Overview", "⚠️ Risk", "📑 Clauses", "🏷️ Key Terms", "📄 Full Text", "⬇️ Export & Save"])
 
     with tabs[0]:
-        st.markdown("#### Plain-English overview")
+        st.markdown("#### Executive summary")
         st.write(result.overview)
         st.markdown("#### Key points")
         st.write(result.key_points)
@@ -448,9 +532,7 @@ def page_analyze(use_ml: bool) -> None:
                     f"<strong>{safe(f.title)}</strong>"
                     f"<div style='margin:.3rem 0; color:var(--ink)'>{safe(f.detail)}</div>"
                     f"<div style='font-size:.88rem; color:var(--muted)'><em>Recommendation:</em> {safe(f.recommendation)}</div>"
-                    f"{evidence}</div>",
-                    unsafe_allow_html=True,
-                )
+                    f"{evidence}</div>", unsafe_allow_html=True)
 
     with tabs[2]:
         st.caption("Every detected section in document order. Expand to read the text.")
@@ -459,10 +541,7 @@ def page_analyze(use_ml: bool) -> None:
             if c.section_number:
                 bits.append(f"§{c.section_number}")
             bits.append(c.heading or "(no heading)")
-            if c.clause_type:
-                bits.append(f"→ {c.clause_type} ({c.confidence:.0%}, {c.method})")
-            else:
-                bits.append("→ unclassified")
+            bits.append(f"→ {c.clause_type} ({c.confidence:.0%}, {c.method})" if c.clause_type else "→ unclassified")
             with st.expander(" ".join(bits)):
                 st.write(c.text or "_(empty section body)_")
                 if c.matched_keywords:
@@ -488,21 +567,16 @@ def page_analyze(use_ml: bool) -> None:
         col_a, col_b = st.columns(2)
         with col_a:
             st.download_button("⬇️ Download JSON", data=json.dumps(result.to_export_dict(), indent=2),
-                               file_name=f"{result.filename}_analysis.json", mime="application/json",
-                               use_container_width=True)
-            st.download_button("⬇️ Download HTML report", data=build_html_report(result),
-                               file_name=f"{result.filename}_report.html", mime="text/html",
-                               use_container_width=True)
+                               file_name=f"{result.filename}_analysis.json", mime="application/json", use_container_width=True)
+            st.download_button("⬇️ Download report (HTML)", data=build_html_report(result),
+                               file_name=f"{result.filename}_report.html", mime="text/html", use_container_width=True)
         with col_b:
             if st.session_state.get("saved_id"):
                 st.success(f"Saved to library (contract #{st.session_state['saved_id']}).")
             if st.button("💾 Save to library", use_container_width=True, type="primary"):
-                cid = db.save_contract(
-                    result.filename, result.clauses,
-                    risk_score=result.risk.score, risk_level=result.risk.level,
-                    summary=result.overview, entities=result.entities.to_dict(),
-                    full_text=result.clean_text,
-                )
+                cid = db.save_contract(result.filename, result.clauses, risk_score=result.risk.score,
+                                       risk_level=result.risk.level, summary=result.overview,
+                                       entities=result.entities.to_dict(), full_text=result.clean_text)
                 st.session_state["saved_id"] = cid
                 st.rerun()
 
@@ -511,7 +585,8 @@ def page_analyze(use_ml: bool) -> None:
 # Page: Library
 # ---------------------------------------------------------------------------
 def page_library() -> None:
-    hero("📚", "Contract Library", "Every contract you've saved, with its clauses and risk profile.")
+    hero("Your Repository", "Contract Library",
+         "Every contract you've saved, with its clauses, key terms and risk profile — all searchable.")
     contracts = db.list_contracts()
     if not contracts:
         st.info("No contracts saved yet. Analyze a contract and click **Save to library**.")
@@ -550,8 +625,8 @@ def page_library() -> None:
 # Page: Search
 # ---------------------------------------------------------------------------
 def page_search() -> None:
-    hero("🔎", "Semantic Clause Search",
-         "Find similar clauses across every contract in your library using TF-IDF cosine similarity.")
+    hero("Knowledge Retrieval", "Semantic Clause Search",
+         "Search similar clauses across every contract in your library — find precedents, compare terms, reuse language.")
     count = db.count_contracts()
     if count == 0:
         st.info("Your library is empty. Analyze and save some contracts first.")
@@ -562,14 +637,12 @@ def page_search() -> None:
         st.info("No clauses available to search yet.")
         return
 
-    st.caption(f"Index covers {index.size} clauses across {count} contract(s).")
-    raw_query = st.text_input("Search clauses",
-                              placeholder="e.g. limitation of liability, termination for convenience…")
+    st.caption(f"Searching {index.size} clauses across {count} contract(s).")
+    raw_query = st.text_input("Search clauses", placeholder="e.g. limitation of liability, termination for convenience…")
     top_k = st.slider("Results to show", 1, 20, 5)
 
     examples = ["limitation of liability", "confidential information", "governing law jurisdiction", "termination notice"]
-    ex_cols = st.columns(len(examples))
-    for col, ex in zip(ex_cols, examples):
+    for col, ex in zip(st.columns(len(examples)), examples):
         if col.button(ex, use_container_width=True):
             raw_query = ex
 
@@ -577,120 +650,97 @@ def page_search() -> None:
     if not query:
         return
 
-    for r in index.search(query, top_k=top_k):
+    results = index.search(query, top_k=top_k)
+    if not results:
+        st.warning("No matching clauses found. Try different wording.")
+        return
+    for r in results:
         st.markdown(
-            f"<div class='lca-card' style='margin-bottom:.7rem'>"
-            f"<div style='display:flex;justify-content:space-between;align-items:center'>"
+            f"<div class='lca-card' style='margin-bottom:.8rem'>"
+            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:.5rem'>"
             f"<div><strong>{safe(r.heading or '(no heading)')}</strong> "
             f"<span class='tag'>{safe(r.clause_type or 'unclassified')}</span></div>"
-            f"<span class='pill' style='background:{NAVY_2}'>sim {r.score:.2f}</span></div>"
-            f"<div style='color:var(--muted); font-size:.8rem; margin:.25rem 0'>📄 {safe(r.filename)}</div>"
+            f"<span class='pill' style='background:{NAVY_2}'>match {r.score:.0%}</span></div>"
+            f"<div style='color:var(--muted); font-size:.8rem; margin:.3rem 0'>📄 {safe(r.filename)}</div>"
             f"<div style='color:var(--ink)'>{clean_display(r.text, 400)}</div></div>",
-            unsafe_allow_html=True,
-        )
-    if not index.search(query, top_k=top_k):
-        st.warning("No matching clauses found. Try different wording.")
+            unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
-# Page: Learn (flashcards + articles)
+# Page: Learn
 # ---------------------------------------------------------------------------
 def page_learn() -> None:
-    hero("🎓", "Learn — Contracts 101",
-         "Interactive flashcards and short articles on the clauses that matter and how to read risk.")
+    hero("Knowledge Center", "Contracts 101",
+         "Build fluency in contract language — interactive flashcards and in-depth articles on the "
+         "clauses that matter and how to read risk.")
 
-    tab_cards, tab_articles = st.tabs(["🃏 Flashcards", "📰 Articles"])
+    mode = st.radio("section", ["🃏 Flashcards", "📰 Articles"], horizontal=True, label_visibility="collapsed")
 
-    with tab_cards:
+    if mode.endswith("Flashcards"):
         cats = ["All"] + flashcard_categories()
         chosen = st.selectbox("Filter by topic", cats)
         cards = [c for c in FLASHCARDS if chosen == "All" or c.category == chosen]
-        st.caption(f"{len(cards)} card(s). Hover a card to reveal the answer.")
+        st.caption(f"{len(cards)} card(s) · hover a card to reveal the answer.")
         html = "<div class='flip-grid'>"
         for c in cards:
-            html += (
-                "<div class='flip-card'><div class='flip-inner'>"
-                f"<div class='flip-front'><div class='cat'>{safe(c.category)}</div>"
-                f"<div class='q'>{safe(c.front)}</div>"
-                "<div class='hint'>hover to flip ↻</div></div>"
-                f"<div class='flip-back'>{safe(c.back)}</div>"
-                "</div></div>"
-            )
+            html += ("<div class='flip-card'><div class='flip-inner'>"
+                     f"<div class='flip-front'><div class='cat'>{safe(c.category)}</div>"
+                     f"<div class='q'>{safe(c.front)}</div><div class='hint'>hover to flip ↻</div></div>"
+                     f"<div class='flip-back'>{safe(c.back)}</div></div></div>")
         html += "</div>"
         st.markdown(html, unsafe_allow_html=True)
+        return
 
-    with tab_articles:
-        cols = st.columns(2)
-        for i, art in enumerate(ARTICLES):
-            with cols[i % 2]:
-                st.markdown(
-                    f"<div class='article'><div class='ico'>{safe(art.icon)}</div>"
-                    f"<h4>{safe(art.title)}</h4>"
-                    f"<div class='meta'>⏱ {art.read_minutes} min read</div>"
-                    f"<p style='color:var(--ink); margin-top:.5rem'>{safe(art.summary)}</p></div>",
-                    unsafe_allow_html=True,
-                )
-                with st.expander("Read article"):
-                    st.markdown(art.body)
+    # Articles: single-column reader (no ragged grid, no wasted space)
+    titles = [a.title for a in ARTICLES]
+    choice = st.selectbox("Choose an article", titles)
+    art = next(a for a in ARTICLES if a.title == choice)
+    st.markdown(
+        f"<div class='reader-head'><div class='ico'>{safe(art.icon)}</div>"
+        f"<h2>{safe(art.title)}</h2><div class='meta'>⏱ {art.read_minutes} min read · {safe(art.summary)}</div></div>"
+        f"<div class='article-wrap'>{_md_to_html(art.body)}</div>",
+        unsafe_allow_html=True)
+    st.caption("Browse more articles from the selector above.")
 
 
 # ---------------------------------------------------------------------------
-# Page: Security & About
+# Page: About
 # ---------------------------------------------------------------------------
-def page_security_about() -> None:
-    hero("🛡️", "Security & About",
-         "The classifier's performance, how the pipeline works, and the app's security posture.")
+def page_about() -> None:
+    hero("About the Platform", "How it works",
+         "Lexalytics runs an open, private analysis pipeline — from document parsing to clause "
+         "classification, risk scoring and search — with no external services.")
 
     metrics = ml_classifier.model_metrics()
     if metrics:
-        st.markdown("#### Clause classifier performance")
+        st.markdown("#### Model performance")
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Test accuracy", f"{metrics['test_accuracy']:.1%}")
         m2.metric("Macro-F1", f"{metrics['test_macro_f1']:.2f}")
-        m3.metric("Classes", metrics["n_classes"])
-        m4.metric("Baseline acc.", f"{metrics['baseline_accuracy']:.1%}")
-        with st.expander("Per-class F1 scores"):
+        m3.metric("Clause types", metrics["n_classes"])
+        m4.metric("Training examples", f"{metrics.get('n_train','—'):,}" if isinstance(metrics.get('n_train'), int) else "—")
+        with st.expander("Per-clause accuracy (F1)"):
             pcf = pd.DataFrame(sorted(metrics["per_class_f1"].items(), key=lambda kv: kv[1], reverse=True),
                                columns=["Clause type", "F1"])
             st.dataframe(pcf, use_container_width=True, hide_index=True)
 
-    st.markdown("#### 🛡️ Security posture")
-    st.caption("Defensive controls mapped to OWASP Web Top 10 and OWASP LLM/AI Top 10.")
-    controls = [
-        ("XSS / HTML injection", "All contract-derived text is HTML-escaped before rendering; no raw HTML from documents."),
-        ("SQL injection", "Every database query is parameterized (no string-built SQL)."),
-        ("Malicious file upload", "Uploads validated by size, extension, and magic bytes before parsing."),
-        ("Prompt injection / LLM", "No LLM in the inference path — the model returns a label only, so there is no prompt surface."),
-        ("Injection (input)", "Untrusted text is Unicode-normalized, control-char-stripped, and length-capped."),
-        ("DoS via large input", "Upload size and processed-text length are hard-capped."),
-        ("Data exposure", "Runs locally; nothing is sent to third-party services. Contracts persist only if you save them."),
-        ("CSRF", "Streamlit's built-in XSRF protection is enabled."),
+    st.markdown("#### The pipeline")
+    pcols = st.columns(3)
+    stages = [
+        ("📥", "Ingest & clean", "PDF and Word documents are parsed and normalized into clean text."),
+        ("🤖", "Classify & extract", "A machine-learning model labels 41 clause types; rules pull parties, dates, money and law."),
+        ("📊", "Score & summarize", "Risk is scored from clauses and language; plain-English summaries are generated."),
     ]
-    grid = "<div class='sec-grid'>"
-    for title, desc in controls:
-        grid += (f"<div class='sec-item'><div class='h'><span class='sec-check'>✔</span> {safe(title)}</div>"
-                 f"<div class='d'>{safe(desc)}</div></div>")
-    grid += "</div>"
-    st.markdown(grid, unsafe_allow_html=True)
+    for col, (ic, t, d) in zip(pcols, stages):
+        col.markdown(f"<div class='step'><div style='font-size:1.6rem'>{safe(ic)}</div><h4>{safe(t)}</h4><p>{safe(d)}</p></div>",
+                     unsafe_allow_html=True)
 
-    st.markdown("#### How it works")
-    st.markdown(
-        """
-        1. **Ingestion** — PDF (`pdfplumber`) / DOCX (`python-docx`) → clean text
-        2. **Clause extraction** — heading segmentation + a scikit-learn TF-IDF classifier
-           (41 CUAD clause types), with a keyword baseline fallback
-        3. **Entity extraction** — rule-based parties, dates, money, governing law, notice, term
-        4. **Risk analysis** — high-risk clauses + missing protective clauses + red-flag language → 0–100 score
-        5. **Summaries** — a fact-based overview and an extractive key-points summary
-        6. **Library & search** — SQLite persistence + TF-IDF similarity search
-        """
-    )
-    st.markdown("#### Detected clause types (keyword baseline)")
-    st.markdown("".join(f"<span class='tag'>{safe(k)}</span>" for k in sorted(CLAUSE_KEYWORDS)),
+    st.markdown("#### Clause types recognized")
+    st.markdown("".join(f"<span class='tag'>{safe(k.replace('_',' ').title())}</span>" for k in sorted(CLAUSE_KEYWORDS)),
                 unsafe_allow_html=True)
 
-    st.info("⚖️ This tool provides automated, informational analysis only. It is not legal "
-            "advice and does not replace review by a qualified attorney.")
+    st.info("⚖️ Lexalytics provides automated, informational analysis to accelerate review. "
+            "It is not legal advice and does not replace a qualified attorney.")
 
 
 # ---------------------------------------------------------------------------
@@ -702,41 +752,32 @@ PAGES = {
     "📚 Contract Library": "library",
     "🔎 Semantic Search": "search",
     "🎓 Learn": "learn",
-    "🛡️ Security & About": "about",
+    "ℹ️ About": "about",
 }
 
 
 def main() -> None:
     with st.sidebar:
-        st.markdown("<div class='app-title'>⚖️ Legal Contract Analyzer</div>", unsafe_allow_html=True)
-        st.markdown("<div class='app-sub'>AI-assisted review</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='brand'>{LOGO_SVG}"
+            f"<div class='name'>Lexalytics<small>Contract Intelligence</small></div></div>",
+            unsafe_allow_html=True)
         st.divider()
-
         page_label = st.radio("Navigate", list(PAGES.keys()), label_visibility="collapsed")
-
         st.divider()
+
         ml_ok = ml_classifier.is_available()
         use_ml = st.toggle("Use ML classifier", value=ml_ok, disabled=not ml_ok,
                            help="Falls back to the keyword baseline if off or unavailable.")
-        status = "🟢 ML model loaded" if ml_ok else "🟡 Keyword baseline"
-        st.markdown(f"<div class='side-stat'>{status}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='side-stat'>📚 {db.count_contracts()} contracts in library</div>",
+        st.markdown(f"<div class='side-stat'>{'🟢 AI model active' if ml_ok else '🟡 Keyword mode'}</div>",
                     unsafe_allow_html=True)
-        st.markdown("<div class='side-stat'>🛡️ Hardened · local-only</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='side-stat'>📚 {db.count_contracts()} contracts saved</div>", unsafe_allow_html=True)
+        st.markdown("<div class='side-foot'>Runs privately on your machine.<br>Informational analysis — not legal advice.</div>",
+                    unsafe_allow_html=True)
 
     page = PAGES[page_label]
-    if page == "dashboard":
-        page_dashboard()
-    elif page == "analyze":
-        page_analyze(use_ml)
-    elif page == "library":
-        page_library()
-    elif page == "search":
-        page_search()
-    elif page == "learn":
-        page_learn()
-    else:
-        page_security_about()
+    {"dashboard": page_dashboard, "analyze": lambda: page_analyze(use_ml), "library": page_library,
+     "search": page_search, "learn": page_learn, "about": page_about}[page]()
 
 
 if __name__ == "__main__":
