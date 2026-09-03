@@ -18,13 +18,6 @@ no paid API, so it deploys to **Streamlit Community Cloud** in a few clicks.
 
 ---
 
-## 📚 Documentation
-
-- **[Full project documentation](docs/PROJECT_DOCUMENTATION.md)** — the complete from-scratch explanation: problem, architecture, every tech-stack decision and *why*, the ML model in depth, design, security, and results.
-- **[Public case study](docs/CASE_STUDY.md)** — portfolio/GitHub showcase with LinkedIn copy and GitHub topics ([PDF version](docs/ClauseLens_Case_Study.pdf)).
-- **[LinkedIn showcase PDF](docs/ClauseLens_LinkedIn.pdf)** — a shareable, review-ready write-up for a general professional audience.
-- **[Security posture](SECURITY.md)** — threat model and OWASP Web/LLM Top-10 mapping.
-
 ## ✨ Features
 
 | Capability | How it works |
