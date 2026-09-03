@@ -34,23 +34,63 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# Palette — premium legal-tech: deep navy / teal / gold on off-white text
+# Theme system — two fully-designed palettes sharing one ClauseLens brand.
+# Every token below is emitted as a CSS variable AND read by Plotly charts,
+# so the whole UI (HTML + charts + report) switches consistently.
 # ---------------------------------------------------------------------------
-BG = "#071525"          # deep navy background
-CARD = "#0D2235"        # card navy
-TEAL_SURFACE = "#123A46"
-NAVY = "#0B1F35"
-NAVY_2 = "#185A63"      # teal
-GOLD = "#D6B35A"
-GOLD_2 = "#E8CA78"
-TEAL = "#185A63"
-INK = "#F5F3ED"         # off-white text
-SLATE = "#8FA1AE"       # muted blue-grey
-SUCCESS = "#5FBF8F"
-WARNING = "#D9A441"
-DANGER = "#C96868"
-SEV_COLORS = {"high": DANGER, "medium": WARNING, "low": SLATE}
-LEVEL_COLORS = {"High": DANGER, "Medium": WARNING, "Low": SUCCESS}
+THEMES = {
+    "dark": {
+        "bg": "#071525", "bg2": "#0B1F35", "card": "#10283A", "card2": "#143344",
+        "teal": "#185A63", "gold": "#D6B35A", "gold2": "#E8CA78",
+        "ink": "#F5F3ED", "muted": "#A8B7C4", "ring": "rgba(214,179,90,.16)", "line": "rgba(168,183,196,.14)",
+        "success": "#5FBF8F", "warning": "#D9A441", "danger": "#C96868",
+        "shadow": "rgba(0,0,0,.42)",
+        "hero_from": "#071627", "hero_mid": "#0c2a3a", "hero_to": "#185A63",
+        "hero_text": "#ffffff", "hero_p": "rgba(245,243,237,.82)", "hero_badge": "rgba(18,58,70,.55)",
+        "hero_grid": "rgba(168,183,196,.06)", "hero_glow": "rgba(214,179,90,.28)",
+        "sidebar_from": "#0a2230", "sidebar_to": "#061320", "sidebar_text": "#cddbe4",
+        "panel_from": "#143344", "panel_to": "#185A63", "input_bg": "#10283A",
+        "stat_grad": "#0b1d2e", "on_risk": "#0a1622",
+    },
+    "light": {
+        "bg": "#F5F3ED", "bg2": "#ECEAE3", "card": "#FFFFFF", "card2": "#FAF9F5",
+        "teal": "#185A63", "gold": "#B89232", "gold2": "#C79A3C",
+        "ink": "#102235", "muted": "#526574", "ring": "rgba(11,31,53,.10)", "line": "rgba(11,31,53,.08)",
+        "success": "#27845A", "warning": "#A87516", "danger": "#B64D4D",
+        "shadow": "rgba(11,31,53,.10)",
+        "hero_from": "#FBFAF6", "hero_mid": "#eef3f1", "hero_to": "#dde9e7",
+        "hero_text": "#0B1F35", "hero_p": "#3a4a5a", "hero_badge": "rgba(11,31,53,.05)",
+        "hero_grid": "rgba(11,31,53,.05)", "hero_glow": "rgba(184,146,50,.22)",
+        "sidebar_from": "#FFFFFF", "sidebar_to": "#ECEAE3", "sidebar_text": "#28384a",
+        "panel_from": "#123A46", "panel_to": "#185A63", "input_bg": "#FFFFFF",
+        "stat_grad": "#FAF9F5", "on_risk": "#ffffff",
+    },
+}
+
+
+def _theme_root(theme: str) -> str:
+    """Emit a :root{} block of CSS variables for the given theme."""
+    p = THEMES[theme]
+    return ":root{" + "".join(f"--{k.replace('_','-')}:{v};" for k, v in p.items()) + "}"
+
+
+def PAL() -> dict:
+    return THEMES[st.session_state.get("theme", "dark")]
+
+
+# Semantic risk colours as CSS vars for inline HTML (theme-aware automatically).
+SEV_VAR = {"high": "var(--danger)", "medium": "var(--warning)", "low": "var(--muted)"}
+LEVEL_VAR = {"High": "var(--danger)", "Medium": "var(--warning)", "Low": "var(--success)"}
+
+
+def _level_colors() -> dict:
+    p = PAL()
+    return {"High": p["danger"], "Medium": p["warning"], "Low": p["success"]}
+
+
+def _sev_colors() -> dict:
+    p = PAL()
+    return {"high": p["danger"], "medium": p["warning"], "low": p["muted"]}
 
 # ---------------------------------------------------------------------------
 # Icon set (clean line icons — no emoji)
@@ -71,10 +111,12 @@ ICONS = {
 }
 
 
-def icon(name: str, size: int = 20, color: str = "currentColor", sw: float = 1.9) -> str:
+def icon(name: str, size: int = 20, color: str = "var(--gold2)", sw: float = 1.9) -> str:
+    # Colour applied via `style` (not the stroke attribute) so CSS vars resolve
+    # and the icon follows the active theme.
     return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
-            f'stroke="{color}" stroke-width="{sw}" stroke-linecap="round" '
-            f'stroke-linejoin="round" style="vertical-align:middle">{ICONS.get(name, "")}</svg>')
+            f'stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round" '
+            f'style="vertical-align:middle;stroke:{color}">{ICONS.get(name, "")}</svg>')
 
 
 # Refined app-icon style emblem: rounded square, gold balance-scale glyph.
@@ -106,24 +148,34 @@ CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap');
 
+/* :root tokens (dark defaults) are overridden per-theme by _theme_root() in main(). */
 :root {
-  --bg:#071525; --bg2:#0a1b2e; --card:#0D2235; --card2:#123A46; --teal:#185A63;
-  --gold:#D6B35A; --gold-2:#E8CA78; --ink:#F5F3ED; --muted:#8FA1AE;
-  --ring:rgba(214,179,90,.14); --line:rgba(143,161,174,.14);
+  --bg:#071525; --bg2:#0B1F35; --card:#10283A; --card2:#143344; --teal:#185A63;
+  --gold:#D6B35A; --gold2:#E8CA78; --ink:#F5F3ED; --muted:#A8B7C4;
+  --ring:rgba(214,179,90,.16); --line:rgba(168,183,196,.14);
   --success:#5FBF8F; --warning:#D9A441; --danger:#C96868;
+  --hero-from:#071627; --hero-mid:#0c2a3a; --hero-to:#185A63; --hero-text:#ffffff;
+  --hero-p:rgba(245,243,237,.82); --hero-badge:rgba(18,58,70,.55); --hero-grid:rgba(168,183,196,.06);
+  --hero-glow:rgba(214,179,90,.28); --sidebar-from:#0a2230; --sidebar-to:#061320; --sidebar-text:#cddbe4;
+  --panel-from:#143344; --panel-to:#185A63; --input-bg:#10283A; --stat-grad:#0b1d2e; --on-risk:#0a1622;
 }
 html, body, [class*="css"] { font-family:'Manrope',system-ui,sans-serif; color:var(--ink); }
 [data-testid="stAppViewContainer"], .stApp { background:
-   radial-gradient(1200px 520px at 100% -10%, rgba(24,90,99,.28), transparent),
-   radial-gradient(900px 420px at -10% 0%, rgba(214,179,90,.08), transparent),
+   radial-gradient(1200px 520px at 100% -10%, var(--hero-glow), transparent),
+   radial-gradient(900px 420px at -10% 0%, var(--hero-glow), transparent),
    var(--bg); }
 [data-testid="stHeader"] { background:transparent; }
+/* smooth cross-theme transition */
+.stApp, section[data-testid="stSidebar"], .hero, .lca-card, .stat, .step, [data-testid="stMetric"],
+.finding-card, .flip-front, .flip-back, .reader-head, [data-testid="stFileUploaderDropzone"],
+.stButton>button, input, textarea, .tag, .side-stat, [data-testid="stExpander"] {
+  transition: background-color .28s ease, color .28s ease, border-color .28s ease, box-shadow .28s ease; }
 .block-container { padding-top:2.6rem; padding-bottom:3.5rem; max-width:1240px; animation:fadeInUp .5s ease both; }
 .block-container p, .block-container li { line-height:1.65; color:var(--ink); }
 h1,h2,h3,h4 { font-family:'Playfair Display',Georgia,serif; color:var(--ink); letter-spacing:.2px; }
 h2 { font-size:1.35rem; margin:1.9rem 0 .7rem; }
 hr { border-color:var(--line); }
-a { color:var(--gold-2); }
+a { color:var(--gold2); }
 
 @keyframes fadeInUp { from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;} }
 @keyframes floatIn { from{opacity:0; transform:translateY(18px) scale(.985);} to{opacity:1; transform:none;} }
@@ -137,23 +189,23 @@ a { color:var(--gold-2); }
 
 /* ---- Hero ---- */
 .hero { position:relative; overflow:hidden; border-radius:22px; padding:2.2rem 2.4rem;
-  background:linear-gradient(125deg,#071627 0%, #0c2a3a 55%, var(--teal) 140%);
-  border:1px solid rgba(214,179,90,.18); box-shadow:0 22px 55px rgba(0,0,0,.45);
+  background:linear-gradient(125deg,var(--hero-from) 0%, var(--hero-mid) 55%, var(--hero-to) 140%);
+  border:1px solid var(--ring); box-shadow:0 22px 55px var(--shadow);
   margin:.2rem 0 1.5rem; animation:floatIn .6s ease both; }
 .hero:before { content:""; position:absolute; inset:0; opacity:.5;
-  background-image:linear-gradient(rgba(143,161,174,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(143,161,174,.05) 1px,transparent 1px);
+  background-image:linear-gradient(var(--hero-grid) 1px,transparent 1px),linear-gradient(90deg,var(--hero-grid) 1px,transparent 1px);
   background-size:34px 34px; mask-image:radial-gradient(600px 300px at 85% 0%, #000, transparent 75%); }
 .hero:after { content:""; position:absolute; right:-70px; top:-70px; width:270px; height:270px; border-radius:50%;
-  background:radial-gradient(circle, rgba(214,179,90,.28), transparent 70%); }
+  background:radial-gradient(circle, var(--hero-glow), transparent 70%); }
 .hero > * { position:relative; z-index:1; }
-.hero .eyebrow { text-transform:uppercase; letter-spacing:3.5px; font-size:.7rem; color:var(--gold-2); font-weight:800; }
-.hero h1 { color:#fff; margin:.4rem 0 .2rem; font-size:2.25rem; line-height:1.1; font-weight:800; }
-.hero h1 em { font-style:italic; color:var(--gold-2); }
+.hero .eyebrow { text-transform:uppercase; letter-spacing:3.5px; font-size:.7rem; color:var(--gold2); font-weight:800; }
+.hero h1 { color:var(--hero-text); margin:.4rem 0 .2rem; font-size:2.25rem; line-height:1.1; font-weight:800; }
+.hero h1 em { font-style:italic; color:var(--gold2); }
 .hero .accent { width:72px; height:4px; border-radius:3px; background:var(--gold); margin:.75rem 0 .85rem; }
-.hero p { color:rgba(245,243,237,.82); margin:0; font-size:1.03rem; max-width:840px; }
+.hero p { color:var(--hero-p); margin:0; font-size:1.03rem; max-width:840px; }
 .hero .badges { margin-top:1.1rem; display:flex; gap:.55rem; flex-wrap:wrap; }
-.hero .badge { display:inline-flex; align-items:center; gap:.45rem; background:rgba(18,58,70,.55);
-  border:1px solid rgba(214,179,90,.35); color:#fff; padding:.36rem .85rem; border-radius:999px; font-size:.78rem; font-weight:600;
+.hero .badge { display:inline-flex; align-items:center; gap:.45rem; background:var(--hero-badge);
+  border:1px solid var(--ring); color:var(--hero-text); padding:.36rem .85rem; border-radius:999px; font-size:.78rem; font-weight:600;
   backdrop-filter:blur(4px); transition:transform .2s ease, border-color .2s ease; }
 .hero .badge:hover { transform:translateY(-2px); border-color:var(--gold); }
 
@@ -166,11 +218,11 @@ a { color:var(--gold-2); }
 .lca-card h3 { margin:.5rem 0 .35rem; font-size:1.18rem; color:var(--ink); }
 
 /* ---- Stat tiles ---- */
-.stat { background:linear-gradient(180deg, var(--card), #0b1d2e); border:1px solid var(--ring); border-radius:18px;
+.stat { background:linear-gradient(180deg, var(--card), var(--stat-grad)); border:1px solid var(--ring); border-radius:18px;
   padding:1.15rem 1.25rem; box-shadow:0 10px 26px rgba(0,0,0,.28); position:relative; overflow:hidden;
   min-height:118px; display:flex; flex-direction:column; justify-content:center; transition:transform .22s ease, border-color .22s ease; }
 .stat:hover { transform:translateY(-5px); border-color:rgba(214,179,90,.4); }
-.stat .v { font-family:'Playfair Display',serif; font-size:2.1rem; font-weight:800; color:#fff; line-height:1; }
+.stat .v { font-family:'Playfair Display',serif; font-size:2.1rem; font-weight:800; color:var(--ink); line-height:1; }
 .stat .v.sm { font-size:1.5rem; letter-spacing:.3px; }
 .stat .l { color:var(--muted); font-size:.84rem; margin-top:.45rem; font-weight:500; }
 .stat .ic { position:absolute; right:1rem; top:1rem; opacity:.9; }
@@ -180,7 +232,7 @@ a { color:var(--gold-2); }
 [data-testid="stMetric"] { background:var(--card); border:1px solid var(--ring); border-radius:16px; padding:1rem 1.15rem;
   box-shadow:0 10px 26px rgba(0,0,0,.26); transition:transform .2s ease; }
 [data-testid="stMetric"]:hover { transform:translateY(-3px); }
-[data-testid="stMetricValue"] { color:#fff; font-weight:800; }
+[data-testid="stMetricValue"] { color:var(--ink); font-weight:800; }
 [data-testid="stMetricLabel"] { color:var(--muted); }
 
 /* ---- Findings ---- */
@@ -188,43 +240,43 @@ a { color:var(--gold-2); }
   padding:.9rem 1.1rem; margin-bottom:.75rem; box-shadow:0 8px 20px rgba(0,0,0,.25); transition:transform .18s ease; animation:floatIn .45s ease both; }
 .finding-card:hover { transform:translateX(4px); }
 .finding-card strong { color:var(--ink); }
-.sev-tag { color:#0a1622; font-size:.66rem; font-weight:800; letter-spacing:.5px; padding:.14rem .55rem; border-radius:6px; margin-right:.5rem; }
+.sev-tag { color:#fff; font-size:.66rem; font-weight:800; letter-spacing:.5px; padding:.14rem .55rem; border-radius:6px; margin-right:.5rem; }
 .sev-high-pulse { animation:pulse 2.2s infinite; }
-.evidence { background:rgba(24,90,99,.2); border-radius:8px; padding:.5rem .7rem; font-size:.8rem;
-  font-family:ui-monospace,Menlo,monospace; color:#cfe0e4; margin-top:.5rem; border-left:3px solid var(--gold); overflow-wrap:anywhere; }
+.evidence { background:var(--card2); border-radius:8px; padding:.5rem .7rem; font-size:.8rem;
+  font-family:ui-monospace,Menlo,monospace; color:var(--muted); margin-top:.5rem; border-left:3px solid var(--gold); overflow-wrap:anywhere; }
 
 /* ---- Pills / tags ---- */
 .pill { display:inline-block; padding:.3rem .75rem; border-radius:999px; font-weight:800; font-size:.78rem; color:#0a1622; }
 .tag { display:inline-block; padding:.22rem .62rem; border-radius:8px; font-size:.74rem; background:rgba(24,90,99,.4);
-  color:var(--gold-2); margin:.14rem; font-weight:600; border:1px solid var(--ring); }
+  color:var(--gold2); margin:.14rem; font-weight:600; border:1px solid var(--ring); }
 .risk-box { text-align:center; }
 .risk-box .lbl { font-size:.68rem; letter-spacing:1.6px; color:var(--muted); text-transform:uppercase; margin-bottom:.4rem; }
-.risk-box .val { display:inline-block; padding:.55rem 1.15rem; border-radius:13px; color:#0a1622; font-weight:800; font-size:1.05rem; box-shadow:0 8px 20px rgba(0,0,0,.3); }
+.risk-box .val { display:inline-block; padding:.55rem 1.15rem; border-radius:13px; color:#fff; font-weight:800; font-size:1.05rem; box-shadow:0 8px 20px var(--shadow); }
 
 /* ---- Workflow steps ---- */
 .step { background:var(--card); border:1px solid var(--ring); border-radius:18px; padding:1.2rem 1.25rem; height:100%;
   box-shadow:0 10px 26px rgba(0,0,0,.26); transition:transform .22s ease, border-color .22s ease; }
 .step:hover { transform:translateY(-5px); border-color:rgba(214,179,90,.4); }
 .step .num { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%;
-  background:linear-gradient(135deg,var(--teal),var(--card2)); color:var(--gold-2); font-weight:800; font-family:'Playfair Display',serif; border:1px solid var(--ring); }
+  background:linear-gradient(135deg,var(--teal),var(--card2)); color:var(--gold2); font-weight:800; font-family:'Playfair Display',serif; border:1px solid var(--ring); }
 .step h4 { margin:.65rem 0 .3rem; color:var(--ink); } .step p { color:var(--muted); font-size:.9rem; margin:0; }
 
 /* ---- Sidebar ---- */
-section[data-testid="stSidebar"] { background:linear-gradient(195deg,#0a2230 0%, #08192a 60%, #061320 100%); border-right:1px solid rgba(214,179,90,.22); }
-section[data-testid="stSidebar"] * { color:#cddbe4; }
+section[data-testid="stSidebar"] { background:linear-gradient(195deg,var(--sidebar-from) 0%, var(--sidebar-to) 100%); border-right:1px solid var(--ring); }
+section[data-testid="stSidebar"] * { color:var(--sidebar-text); }
 .brand { display:flex; align-items:center; gap:.7rem; padding:.2rem 0 .1rem; }
-.brand .name { font-family:'Playfair Display',serif; color:#fff; font-size:1.22rem; font-weight:800; line-height:1.05; }
-.brand .name small { display:block; color:var(--gold-2); font-size:.6rem; letter-spacing:2.6px; text-transform:uppercase; font-family:'Manrope',sans-serif; font-weight:700; margin-top:3px; }
+.brand .name { font-family:'Playfair Display',serif; color:var(--ink); font-size:1.22rem; font-weight:800; line-height:1.05; }
+.brand .name small { display:block; color:var(--gold2); font-size:.6rem; letter-spacing:2.6px; text-transform:uppercase; font-family:'Manrope',sans-serif; font-weight:700; margin-top:3px; }
 section[data-testid="stSidebar"] hr { border-color:rgba(143,161,174,.16); margin:.7rem 0; }
 section[data-testid="stSidebar"] .stButton>button { justify-content:flex-start !important; text-align:left !important;
-  border:none; background:transparent; color:#c3d2dc; font-weight:600; border-left:3px solid transparent; border-radius:10px;
+  border:none; background:transparent; color:var(--sidebar-text); font-weight:600; border-left:3px solid transparent; border-radius:10px;
   padding:.58rem .95rem; box-shadow:none; white-space:nowrap; overflow:hidden; gap:.7rem !important; transition:all .18s ease; }
 section[data-testid="stSidebar"] .stButton>button > * { justify-content:flex-start !important; }
 section[data-testid="stSidebar"] .stButton>button p,
 section[data-testid="stSidebar"] .stButton>button div,
 section[data-testid="stSidebar"] .stButton>button span { white-space:nowrap; margin:0; text-align:left !important; }
-section[data-testid="stSidebar"] .stButton>button:hover { background:rgba(24,90,99,.35); transform:translateX(3px); color:#fff; }
-section[data-testid="stSidebar"] .stButton>button[kind="primary"] { background:linear-gradient(90deg,rgba(214,179,90,.2),rgba(24,90,99,.2)); color:#fff; border-left-color:var(--gold); }
+section[data-testid="stSidebar"] .stButton>button:hover { background:rgba(24,90,99,.28); transform:translateX(3px); color:var(--ink); }
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] { background:linear-gradient(90deg,rgba(214,179,90,.22),rgba(24,90,99,.18)); color:var(--ink); border-left-color:var(--gold); }
 .side-stat { display:flex; align-items:center; gap:.5rem; background:rgba(18,58,70,.4); border:1px solid rgba(214,179,90,.2);
   border-radius:11px; padding:.55rem .75rem; font-size:.82rem; margin-top:.5rem; }
 
@@ -241,23 +293,27 @@ section[data-testid="stSidebar"] .stButton>button[kind="primary"] { background:l
 textarea, [data-baseweb="input"] { background:var(--card) !important; border-color:var(--line) !important; color:var(--ink) !important; }
 [data-testid="stTextInput"] input:focus { border-color:var(--gold) !important; box-shadow:0 0 0 2px rgba(214,179,90,.25) !important; }
 [data-testid="stWidgetLabel"] p, label p { color:var(--muted) !important; }
+/* keep radio / checkbox / slider text legible in both themes */
+.stRadio label p, .stCheckbox label p, [data-baseweb="radio"] div, .stSlider label,
+[data-testid="stMarkdownContainer"] p { color:var(--ink); }
+[data-baseweb="popover"] li, [data-baseweb="menu"] li { color:var(--ink); }
 
 /* ---- File uploader — premium drop zone ---- */
-[data-testid="stFileUploaderDropzone"] { background:linear-gradient(180deg,var(--card),#0a1c2c);
+[data-testid="stFileUploaderDropzone"] { background:linear-gradient(180deg,var(--card),var(--card2));
   border:2px dashed rgba(214,179,90,.4); border-radius:16px; padding:2rem 1.5rem; transition:all .25s ease; }
-[data-testid="stFileUploaderDropzone"]:hover { border-color:var(--gold); background:linear-gradient(180deg,#10293c,#0a1c2c);
-  box-shadow:0 0 0 4px rgba(214,179,90,.12), 0 14px 34px rgba(0,0,0,.4); transform:translateY(-2px); }
+[data-testid="stFileUploaderDropzone"]:hover { border-color:var(--gold); background:linear-gradient(180deg,var(--card2),var(--card));
+  box-shadow:0 0 0 4px rgba(214,179,90,.12), 0 14px 34px var(--shadow); transform:translateY(-2px); }
 [data-testid="stFileUploaderDropzone"] * { color:var(--ink) !important; }
 [data-testid="stFileUploaderDropzone"] small { color:var(--muted) !important; }
 
 /* ---- Tabs ---- */
 .stTabs [data-baseweb="tab-list"] { gap:.3rem; border-bottom:1px solid var(--line); }
 .stTabs [data-baseweb="tab"] { border-radius:11px 11px 0 0; padding:.45rem 1rem; color:var(--muted); }
-.stTabs [aria-selected="true"] { background:rgba(24,90,99,.35); color:var(--gold-2); }
+.stTabs [aria-selected="true"] { background:rgba(24,90,99,.35); color:var(--gold2); }
 
 /* ---- Expander / status / dataframe ---- */
 [data-testid="stExpander"] { background:var(--card); border:1px solid var(--ring); border-radius:14px; }
-[data-testid="stExpander"] summary:hover { color:var(--gold-2); }
+[data-testid="stExpander"] summary:hover { color:var(--gold2); }
 [data-testid="stDataFrame"] { border:1px solid var(--ring); border-radius:12px; }
 
 /* ---- Flashcards ---- */
@@ -267,21 +323,21 @@ textarea, [data-baseweb="input"] { background:var(--card) !important; border-col
 .flip-card:hover .flip-inner { transform:rotateY(180deg); }
 .flip-front, .flip-back { position:absolute; inset:0; backface-visibility:hidden; border-radius:17px; padding:1.2rem;
   display:flex; flex-direction:column; justify-content:center; box-shadow:0 12px 30px rgba(0,0,0,.4); }
-.flip-front { background:linear-gradient(140deg,var(--card2),var(--teal)); color:#fff; border:1px solid var(--ring); }
+.flip-front { background:linear-gradient(140deg,var(--panel-from),var(--panel-to)); color:#fff; border:1px solid var(--ring); }
 .flip-front .q { font-family:'Playfair Display',serif; font-size:1.08rem; font-weight:700; }
-.flip-front .cat { position:absolute; top:.8rem; right:.9rem; font-size:.62rem; color:var(--gold-2); text-transform:uppercase; letter-spacing:1.5px; font-weight:800; }
+.flip-front .cat { position:absolute; top:.8rem; right:.9rem; font-size:.62rem; color:var(--gold2); text-transform:uppercase; letter-spacing:1.5px; font-weight:800; }
 .flip-front .hint { position:absolute; bottom:.8rem; left:1.2rem; font-size:.7rem; color:rgba(245,243,237,.6); }
 .flip-back { background:var(--card); color:var(--ink); transform:rotateY(180deg); border:1px solid var(--gold); font-size:.9rem; line-height:1.5; overflow:auto; }
 
 /* ---- Article reader ---- */
-.reader-head { background:linear-gradient(120deg,#0c2a3a,var(--teal)); color:#fff; border-radius:18px; padding:1.7rem 2rem;
+.reader-head { background:linear-gradient(120deg,var(--panel-from),var(--panel-to)); color:#fff; border-radius:18px; padding:1.7rem 2rem;
   position:relative; overflow:hidden; box-shadow:0 16px 36px rgba(0,0,0,.4); border:1px solid var(--ring); margin-bottom:1.4rem; animation:floatIn .5s ease both; }
 .reader-head:after { content:""; position:absolute; right:-40px; top:-40px; width:170px; height:170px; border-radius:50%;
   background:radial-gradient(circle,rgba(214,179,90,.3),transparent 70%); }
-.reader-head h2 { color:#fff; margin:.35rem 0 .3rem; } .reader-head .meta { color:var(--gold-2); font-size:.82rem; font-weight:600; }
+.reader-head h2 { color:#fff; margin:.35rem 0 .3rem; } .reader-head .meta { color:var(--gold2); font-size:.82rem; font-weight:600; }
 .article-wrap { max-width:820px; }
-.article-wrap p, .article-wrap li { font-size:1.02rem; line-height:1.8; color:#dbe3e8; }
-.article-wrap h4 { margin-top:1.5rem; color:var(--gold-2); }
+.article-wrap p, .article-wrap li { font-size:1.02rem; line-height:1.8; color:var(--ink); }
+.article-wrap h4 { margin-top:1.5rem; color:var(--gold2); }
 .article-wrap strong { color:var(--ink); }
 .article-wrap p:first-of-type:first-letter { font-family:'Playfair Display',serif; font-size:2.8rem; font-weight:800; color:var(--gold); float:left; line-height:.8; margin:.15rem .6rem 0 0; }
 
@@ -304,7 +360,7 @@ def hero(eyebrow: str, title: str, subtitle: str, badges: list[tuple[str, str]] 
     badge_html = ""
     if badges:
         badge_html = "<div class='badges'>" + "".join(
-            f"<span class='badge'>{icon(ic, 14, GOLD_2)} {safe(txt)}</span>" for ic, txt in badges
+            f"<span class='badge'>{icon(ic, 14, 'var(--gold2)')} {safe(txt)}</span>" for ic, txt in badges
         ) + "</div>"
     st.markdown(
         f"<div class='hero'><div class='eyebrow'>{safe(eyebrow)}</div>"
@@ -314,33 +370,39 @@ def hero(eyebrow: str, title: str, subtitle: str, badges: list[tuple[str, str]] 
 
 def stat_tile(value, label: str, icon_name: str, gold: bool = False, small: bool = False) -> str:
     cls = "stat gold" if gold else "stat"
-    col = GOLD if gold else GOLD_2
+    col = "var(--gold)" if gold else "var(--gold2)"
     vcls = "v sm" if small else "v"
     return (f"<div class='{cls}'><div class='ic'>{icon(icon_name, 22, col)}</div>"
             f"<div class='{vcls}'>{safe(value)}</div><div class='l'>{safe(label)}</div></div>")
 
 
 def _theme_fig(fig: go.Figure, height: int = 320) -> go.Figure:
+    p = PAL()
+    dark = st.session_state.get("theme", "dark") == "dark"
+    grid = "rgba(168,183,196,.14)" if dark else "rgba(11,31,53,.09)"
     fig.update_layout(height=height, margin=dict(l=10, r=10, t=48, b=10),
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(family="Manrope, sans-serif", color=INK),
-                      title_font=dict(family="Playfair Display, serif", color=GOLD_2, size=16),
-                      legend=dict(orientation="h", yanchor="bottom", y=-0.25, font=dict(color=INK)))
-    fig.update_xaxes(gridcolor="rgba(143,161,174,.12)", zerolinecolor="rgba(143,161,174,.2)", color=SLATE)
-    fig.update_yaxes(gridcolor="rgba(143,161,174,.12)", zerolinecolor="rgba(143,161,174,.2)", color=SLATE)
+                      font=dict(family="Manrope, sans-serif", color=p["ink"]),
+                      title_font=dict(family="Playfair Display, serif", color=p["gold2"], size=16),
+                      legend=dict(orientation="h", yanchor="bottom", y=-0.25, font=dict(color=p["ink"])))
+    fig.update_xaxes(gridcolor=grid, zerolinecolor=grid, color=p["muted"])
+    fig.update_yaxes(gridcolor=grid, zerolinecolor=grid, color=p["muted"])
     return fig
 
 
 def risk_gauge(score: int, level: str) -> go.Figure:
-    color = LEVEL_COLORS.get(level, GOLD)
+    p = PAL()
+    dark = st.session_state.get("theme", "dark") == "dark"
+    color = _level_colors().get(level, p["gold"])
     fig = go.Figure(go.Indicator(
-        mode="gauge+number", value=score, number={"suffix": "/100", "font": {"size": 32, "color": INK}},
-        gauge={"axis": {"range": [0, 100], "tickcolor": SLATE, "tickfont": {"color": SLATE}},
-               "bar": {"color": color, "thickness": 0.32}, "borderwidth": 0, "bgcolor": "rgba(255,255,255,.04)",
+        mode="gauge+number", value=score, number={"suffix": "/100", "font": {"size": 32, "color": p["ink"]}},
+        gauge={"axis": {"range": [0, 100], "tickcolor": p["muted"], "tickfont": {"color": p["muted"]}},
+               "bar": {"color": color, "thickness": 0.32}, "borderwidth": 0,
+               "bgcolor": "rgba(255,255,255,.04)" if dark else "rgba(11,31,53,.04)",
                "steps": [{"range": [0, 25], "color": "rgba(95,191,143,.22)"}, {"range": [25, 55], "color": "rgba(217,164,65,.22)"},
                          {"range": [55, 100], "color": "rgba(201,104,104,.22)"}],
                "threshold": {"line": {"color": color, "width": 4}, "value": score}},
-        title={"text": f"<b style='color:{INK}'>{level} risk</b>"}))
+        title={"text": f"<b style='color:{p['ink']}'>{level} risk</b>"}))
     return _theme_fig(fig, 250)
 
 
@@ -349,7 +411,7 @@ def clause_bar(detected) -> go.Figure | None:
         return None
     counts = pd.Series([c.clause_type for c in detected]).value_counts().reset_index()
     counts.columns = ["Clause Type", "Count"]
-    fig = px.bar(counts, x="Clause Type", y="Count", title="Clause types found", color_discrete_sequence=[NAVY_2])
+    fig = px.bar(counts, x="Clause Type", y="Count", title="Clause types found", color_discrete_sequence=[PAL()["teal"]])
     fig.update_layout(xaxis_tickangle=-30)
     return _theme_fig(fig, 360)
 
@@ -359,7 +421,7 @@ def severity_donut(counts: dict) -> go.Figure | None:
     if not data:
         return None
     fig = px.pie(values=list(data.values()), names=list(data.keys()), hole=0.55, title="Findings by severity",
-                 color=list(data.keys()), color_discrete_map={"High": SEV_COLORS["high"], "Medium": SEV_COLORS["medium"], "Low": SEV_COLORS["low"]})
+                 color=list(data.keys()), color_discrete_map={"High": _sev_colors()["high"], "Medium": _sev_colors()["medium"], "Low": _sev_colors()["low"]})
     fig.update_traces(textinfo="value")
     return _theme_fig(fig, 300)
 
@@ -370,7 +432,7 @@ def method_donut(clauses) -> go.Figure | None:
         return None
     s = pd.Series(labels).value_counts()
     fig = px.pie(values=s.values, names=s.index, hole=0.55, title="How clauses were identified",
-                 color_discrete_sequence=[NAVY_2, GOLD])
+                 color_discrete_sequence=[PAL()["teal"], PAL()["gold"]])
     return _theme_fig(fig, 300)
 
 
@@ -446,7 +508,7 @@ def page_dashboard() -> None:
                   ("shield", "Risk surfaced, not missed", "One-sided terms, uncapped liability and auto-renewals are flagged — along with the protections that are absent."),
                   ("search", "Institutional memory", "Every reviewed contract stays searchable, so precedents and standard language are always a query away.")]
         for col, (ic, t, d) in zip(st.columns(3), solves):
-            col.markdown(f"<div class='lca-card'><div class='ic'>{icon(ic, 22, GOLD_2)}</div><h3>{safe(t)}</h3>"
+            col.markdown(f"<div class='lca-card'><div class='ic'>{icon(ic, 22, 'var(--gold2)')}</div><h3>{safe(t)}</h3>"
                          f"<div style='color:var(--muted)'>{safe(d)}</div></div>", unsafe_allow_html=True)
         st.markdown("<div style='height:.6rem'></div>", unsafe_allow_html=True)
         st.info("Head to **Analyze Contract** and upload one of your agreements — watch ClauseLens reveal the clauses, key terms and risks in seconds.")
@@ -468,14 +530,14 @@ def page_dashboard() -> None:
         lvl = df["risk_level"].value_counts()
         if not lvl.empty:
             fig = px.pie(values=lvl.values, names=lvl.index, hole=0.55, title="Risk across your contracts",
-                         color=lvl.index, color_discrete_map=LEVEL_COLORS)
+                         color=lvl.index, color_discrete_map=_level_colors())
             st.plotly_chart(_theme_fig(fig, 330), use_container_width=True)
     with right:
         types = [c["clause_type"] for c in db.get_all_clauses() if c.get("clause_type")]
         if types:
             s = pd.Series(types).value_counts().head(10).reset_index()
             s.columns = ["Clause Type", "Count"]
-            fig = px.bar(s, x="Count", y="Clause Type", orientation="h", title="Most common clauses", color_discrete_sequence=[GOLD])
+            fig = px.bar(s, x="Count", y="Clause Type", orientation="h", title="Most common clauses", color_discrete_sequence=[PAL()["gold"]])
             fig.update_layout(yaxis={"categoryorder": "total ascending"})
             st.plotly_chart(_theme_fig(fig, 330), use_container_width=True)
 
@@ -563,8 +625,8 @@ def page_analyze(use_ml: bool) -> None:
                 pulse = " sev-high-pulse" if f.severity == "high" else ""
                 evidence = f"<div class='evidence'>{clean_display(f.evidence, 260)}</div>" if f.evidence else ""
                 st.markdown(
-                    f"<div class='finding-card{pulse}' style='border-left-color:{SEV_COLORS.get(f.severity)}'>"
-                    f"<span class='sev-tag' style='background:{SEV_COLORS.get(f.severity)}'>{safe(f.severity.upper())}</span>"
+                    f"<div class='finding-card{pulse}' style='border-left-color:{SEV_VAR.get(f.severity)}'>"
+                    f"<span class='sev-tag' style='background:{SEV_VAR.get(f.severity)}'>{safe(f.severity.upper())}</span>"
                     f"<strong>{safe(f.title)}</strong>"
                     f"<div style='margin:.3rem 0; color:var(--ink)'>{safe(f.detail)}</div>"
                     f"<div style='font-size:.88rem; color:var(--muted)'><em>Recommendation:</em> {safe(f.recommendation)}</div>"
@@ -604,7 +666,7 @@ def page_analyze(use_ml: bool) -> None:
         with col_a:
             st.download_button("Download data (JSON)", data=json.dumps(result.to_export_dict(), indent=2),
                                file_name=f"{result.filename}_analysis.json", mime="application/json", use_container_width=True)
-            st.download_button("Download report (HTML)", data=build_html_report(result),
+            st.download_button("Download report (HTML)", data=build_html_report(result, theme=st.session_state.get("theme", "dark")),
                                file_name=f"{result.filename}_report.html", mime="text/html", use_container_width=True)
         with col_b:
             if st.session_state.get("saved_id"):
@@ -646,7 +708,7 @@ def page_library() -> None:
     with top[1]:
         lvl = contract.get("risk_level", "—")
         sc = contract.get("risk_score", "—")
-        color = LEVEL_COLORS.get(lvl, NAVY)
+        color = LEVEL_VAR.get(lvl, "var(--teal)")
         st.markdown(f"<div class='risk-box'><div class='lbl'>Overall risk</div>"
                     f"<div class='val' style='background:{color}'>{safe(lvl)} · {safe(sc)}/100</div></div>",
                     unsafe_allow_html=True)
@@ -697,9 +759,9 @@ def page_search() -> None:
             f"<div class='lca-card' style='margin-bottom:.8rem'>"
             f"<div style='display:flex;justify-content:space-between;align-items:center;gap:.5rem'>"
             f"<div><strong>{safe(r.heading or '(no heading)')}</strong> <span class='tag'>{safe(r.clause_type or 'unclassified')}</span></div>"
-            f"<span class='pill' style='background:{GOLD}'>match {r.score:.0%}</span></div>"
+            f"<span class='pill' style='background:var(--gold)'>match {r.score:.0%}</span></div>"
             f"<div style='color:var(--muted); font-size:.8rem; margin:.3rem 0; display:flex; align-items:center; gap:.35rem'>"
-            f"{icon('file', 14, SLATE)} {safe(r.filename)}</div>"
+            f"{icon('file', 14, 'var(--muted)')} {safe(r.filename)}</div>"
             f"<div style='color:var(--ink)'>{clean_display(r.text, 400)}</div></div>", unsafe_allow_html=True)
 
 
@@ -760,7 +822,7 @@ def page_about() -> None:
     for col, (ic, t, d) in zip(st.columns(3), stages):
         col.markdown(f"<div class='step'><div class='ic' style='width:44px;height:44px;border-radius:12px;display:flex;"
                      f"align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(28,74,126,.12),rgba(201,162,39,.14))'>"
-                     f"{icon(ic, 22, NAVY_2)}</div><h4>{safe(t)}</h4><p>{safe(d)}</p></div>", unsafe_allow_html=True)
+                     f"{icon(ic, 22, 'var(--teal)')}</div><h4>{safe(t)}</h4><p>{safe(d)}</p></div>", unsafe_allow_html=True)
 
     st.markdown("#### Clause types recognized")
     st.markdown("".join(f"<span class='tag'>{safe(k.replace('_',' ').title())}</span>" for k in sorted(CLAUSE_KEYWORDS)),
@@ -787,6 +849,13 @@ ROUTES = {"dashboard": page_dashboard, "library": page_library, "search": page_s
 def main() -> None:
     if "nav" not in st.session_state:
         st.session_state.nav = "dashboard"
+    # Theme: default from URL query param (persists across sessions), else dark.
+    if "theme" not in st.session_state:
+        qp = st.query_params.get("theme")
+        st.session_state.theme = qp if qp in ("dark", "light") else "dark"
+
+    # Inject the active theme's CSS variables (overrides the dark defaults).
+    st.markdown(f"<style>{_theme_root(st.session_state.theme)}</style>", unsafe_allow_html=True)
 
     with st.sidebar:
         st.markdown(f"<div class='brand'>{LOGO_SVG}<div class='name'>ClauseLens<small>Contract Analyzer</small></div></div>",
@@ -803,10 +872,23 @@ def main() -> None:
         ml_ok = ml_classifier.is_available()
         use_ml = st.toggle("Smart clause detection", value=ml_ok, disabled=not ml_ok,
                            help="Uses the trained model to recognize clauses; falls back to keywords if turned off.")
-        st.markdown(f"<div class='side-stat'>{icon('check', 15, GOLD_2)} {'Model ready' if ml_ok else 'Keyword mode'}</div>",
+        st.markdown(f"<div class='side-stat'>{icon('check', 15, 'var(--gold2)')} {'Model ready' if ml_ok else 'Keyword mode'}</div>",
                     unsafe_allow_html=True)
-        st.markdown(f"<div class='side-stat'>{icon('file', 15, GOLD_2)} {db.count_contracts()} contracts saved</div>",
+        st.markdown(f"<div class='side-stat'>{icon('file', 15, 'var(--gold2)')} {db.count_contracts()} contracts saved</div>",
                     unsafe_allow_html=True)
+
+        # ---- Theme toggle ----
+        st.divider()
+        st.markdown("<div style='font-size:.72rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);"
+                    "font-weight:700;margin-bottom:.3rem'>Appearance</div>", unsafe_allow_html=True)
+        cur = st.session_state.theme
+        choice = st.radio("Theme", ["🌙  Dark", "☀️  Light"], index=0 if cur == "dark" else 1,
+                          horizontal=True, label_visibility="collapsed", key="theme_radio")
+        new_theme = "dark" if choice.startswith("🌙") else "light"
+        if new_theme != cur:
+            st.session_state.theme = new_theme
+            st.query_params["theme"] = new_theme
+            st.rerun()
 
     nav = st.session_state.nav
     if nav == "analyze":

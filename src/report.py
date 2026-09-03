@@ -54,9 +54,23 @@ def _entities_rows(entities: dict) -> str:
     return "\n".join(rows) or "<tr><td colspan='2' style='color:#8794a3'>No key terms extracted.</td></tr>"
 
 
-def build_html_report(result) -> str:
+_REPORT_THEMES = {
+    "light": {"page_bg": "#f4f7fb", "sheet_bg": "#ffffff", "ink": "#1f2933", "muted": "#7d8a99",
+              "ring": "#e4e9f0", "surf": "#f7f9fc", "chip_bg": "rgba(24,90,99,.10)", "chip_col": "#155059",
+              "heading": "#0B1F35", "rec_col": "#42505f", "evid_col": "#52606d"},
+    "dark": {"page_bg": "#071525", "sheet_bg": "#0D2235", "ink": "#EDEFF2", "muted": "#A8B7C4",
+             "ring": "rgba(214,179,90,.16)", "surf": "#10283A", "chip_bg": "rgba(24,90,99,.4)", "chip_col": "#E8CA78",
+             "heading": "#F5F3ED", "rec_col": "#cbd5dd", "evid_col": "#b9c6cf"},
+}
+
+
+def build_html_report(result, theme: str = "light") -> str:
     r = result
     risk = r.risk
+    t = _REPORT_THEMES.get(theme, _REPORT_THEMES["light"])
+    page_bg, sheet_bg, ink, muted = t["page_bg"], t["sheet_bg"], t["ink"], t["muted"]
+    ring, surf, chip_bg, chip_col = t["ring"], t["surf"], t["chip_bg"], t["chip_col"]
+    heading, rec_col, evid_col = t["heading"], t["rec_col"], t["evid_col"]
     level_color = _LEVEL_COLORS.get(risk.level, NAVY)
     generated = datetime.now().strftime("%B %d, %Y · %H:%M")
 
@@ -92,11 +106,11 @@ def build_html_report(result) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Contract Analysis — {_esc(r.filename)}</title>
 <style>
-  :root {{ --navy:{NAVY}; --navy2:{NAVY_2}; --gold:{GOLD}; --ink:#1f2933; --muted:#7d8a99; --ring:#e4e9f0; }}
+  :root {{ --navy:{NAVY}; --navy2:{NAVY_2}; --gold:{GOLD}; --ink:{ink}; --muted:{muted}; --ring:{ring}; }}
   * {{ box-sizing:border-box; }}
   body {{ font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
-         max-width:900px; margin:0 auto; padding:0 0 3rem; line-height:1.6; background:#f4f7fb; }}
-  .sheet {{ background:#fff; }}
+         max-width:900px; margin:0 auto; padding:0 0 3rem; line-height:1.6; background:{page_bg}; }}
+  .sheet {{ background:{sheet_bg}; }}
   header.hero {{ background:linear-gradient(120deg,#0c223d,var(--navy) 45%,var(--navy2));
     color:#fff; padding:2rem 2.4rem; position:relative; overflow:hidden; }}
   header.hero:after {{ content:""; position:absolute; right:-60px; top:-60px; width:200px; height:200px;
@@ -109,9 +123,9 @@ def build_html_report(result) -> str:
   header h1 {{ font-size:1.7rem; margin:.2rem 0 .1rem; font-weight:800; }}
   header .meta {{ color:rgba(255,255,255,.8); font-size:.85rem; }}
   main {{ padding:1.6rem 2.4rem; }}
-  h2 {{ font-size:1.15rem; color:var(--navy); margin:1.8rem 0 .6rem; padding-bottom:.35rem; border-bottom:2px solid #eef2f7; }}
+  h2 {{ font-size:1.15rem; color:{heading}; margin:1.8rem 0 .6rem; padding-bottom:.35rem; border-bottom:2px solid {ring}; }}
   h2:first-child {{ margin-top:.4rem; }}
-  .summary {{ background:#f7f9fc; border:1px solid var(--ring); border-left:4px solid var(--gold); border-radius:10px; padding:1rem 1.2rem; }}
+  .summary {{ background:{surf}; border:1px solid var(--ring); border-left:4px solid var(--gold); border-radius:10px; padding:1rem 1.2rem; }}
   .riskrow {{ display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }}
   .score {{ display:flex; flex-direction:column; align-items:center; justify-content:center; width:120px; height:120px;
     border-radius:50%; color:#fff; background:{level_color}; box-shadow:0 8px 20px rgba(15,42,74,.18); }}
@@ -119,17 +133,17 @@ def build_html_report(result) -> str:
   .score .lv {{ font-size:.8rem; font-weight:700; margin-top:.2rem; letter-spacing:.5px; }}
   .sevchips {{ display:flex; gap:.5rem; flex-wrap:wrap; }}
   .sevchip {{ padding:.3rem .8rem; border-radius:999px; color:#fff; font-size:.8rem; font-weight:700; }}
-  .finding {{ border:1px solid var(--ring); border-left:5px solid #ccc; border-radius:10px; padding:.8rem 1rem; margin:.6rem 0; background:#fff; }}
+  .finding {{ border:1px solid var(--ring); border-left:5px solid #ccc; border-radius:10px; padding:.8rem 1rem; margin:.6rem 0; background:{surf}; }}
   .finding .sev {{ color:#fff; font-size:.66rem; font-weight:800; padding:.12rem .5rem; border-radius:5px; margin-right:.5rem; letter-spacing:.5px; }}
-  .finding .ftitle {{ font-weight:700; color:var(--navy); }}
-  .finding p {{ margin:.35rem 0; font-size:.92rem; }} .finding .rec {{ color:#42505f; font-size:.88rem; }}
-  .evidence {{ background:#f7f9fc; border-left:3px solid var(--gold); border-radius:5px; padding:.4rem .6rem;
-    font-size:.8rem; color:#52606d; margin-top:.4rem; font-family:ui-monospace,Menlo,monospace; overflow-wrap:anywhere; }}
+  .finding .ftitle {{ font-weight:700; color:{heading}; }}
+  .finding p {{ margin:.35rem 0; font-size:.92rem; }} .finding .rec {{ color:{rec_col}; font-size:.88rem; }}
+  .evidence {{ background:{page_bg}; border-left:3px solid var(--gold); border-radius:5px; padding:.4rem .6rem;
+    font-size:.8rem; color:{evid_col}; margin-top:.4rem; font-family:ui-monospace,Menlo,monospace; overflow-wrap:anywhere; }}
   table {{ border-collapse:collapse; width:100%; margin-top:.5rem; font-size:.9rem; }}
   th, td {{ border:1px solid var(--ring); padding:.5rem .65rem; text-align:left; vertical-align:top; }}
   thead th {{ background:var(--navy); color:#fff; font-weight:600; }}
-  .kv th {{ background:#f7f9fc; width:170px; color:var(--navy); }}
-  .chip {{ background:rgba(28,74,126,.1); color:var(--navy2); padding:.12rem .5rem; border-radius:6px; font-size:.78rem; font-weight:600; }}
+  .kv th {{ background:{surf}; width:170px; color:{heading}; }}
+  .chip {{ background:{chip_bg}; color:{chip_col}; padding:.12rem .5rem; border-radius:6px; font-size:.78rem; font-weight:600; }}
   .muted {{ color:var(--muted); }}
   footer {{ padding:1.2rem 2.4rem 0; color:var(--muted); font-size:.8rem; border-top:1px solid var(--ring); margin-top:1.5rem; }}
   @media print {{ body {{ background:#fff; }} .sheet {{ box-shadow:none; }} }}
